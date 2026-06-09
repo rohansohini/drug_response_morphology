@@ -1,0 +1,14 @@
+# raw and processed data
+raw_data/
+processed_data/
+
+# logs
+logs/
+
+# python
+__pycache__/
+*.pyc
+
+# jupyter
+*.ipynb
+.ipynb_checkpoints/
