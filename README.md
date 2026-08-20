@@ -35,7 +35,7 @@ process_imaging_data/
     ├── join_data.py
     ├── build_masks.py
     ├── combine_tracks.py
-    ├── append_klabels.py
+    ├── append_labels.py
     └── utils/
         └── image_utils.py
 ```
@@ -44,7 +44,7 @@ Where:
 - `{drug_name}` — one folder per condition (e.g. `naive`, `vemurafenib`)
 - `track_table_XX.mat` — cell track data, one per track
 - `segmentation_info_XX.mat` — nuclear segmentation data, one per track
-- `sorted_idx.mat` — k-means cluster labels, one per lineage
+- `sorted_idx.mat` — lineage classification labels (`CloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
 - `transmission_region_XX/` — cell segmentation masks, one folder per track
 - `transmission_YY_masks.tiff` — segmentation mask, one per frame
 
@@ -56,7 +56,7 @@ The pipeline runs end-to-end for each drug condition found under `raw_data/`. St
 
 **1. `track_table.py`** — Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks.
 
-**2. `append_klabels.py`** — Append k-means cluster labels to the cell DataFrame. One label per lineage, broadcast to all rows sharing that `lin_id`.
+**2. `append_labels.py`** — Append lineage classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per lineage, broadcast to all rows sharing that `lin_id`.
 
 **3. `load_nuclear_data.py`** — Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts.
 
@@ -87,7 +87,8 @@ One row per cell per frame with the following columns:
 | `has_mask` | True if cell was matched to a nucleus and passed blob resolution |
 | `pixel_dup` | True if cell shared a pixel ID with another cell in the same `(track, frame)` |
 | `mask_fail_reason` | Reason for `has_mask=False`: `none`, `no_nuc_match` (no nucleus found, NaN, or empty array), `no_cell_seg`, `pixel_dup`, `multi_nuc`, `nuc_outside_cell`, `multi_cell` |
-| `k_label` | K-means cluster label for this cell's lineage |
+| `m_label` | Broad lineage class: `1` = dying, `2` = persister, `3` = proliferator |
+| `k_label` | Sub-class (1-6) within `m_label`, for a total of 18 combined labels |
 
 ### `{drug_name}_frame_YY_mask.tiff`
 2-layer TIFF where:

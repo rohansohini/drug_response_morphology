@@ -5,7 +5,7 @@ import pandas as pd
 from natsort import natsorted
 
 from pipeline.track_table        import load_track_table
-from pipeline.append_klabels     import append_klabels
+from pipeline.append_labels      import append_labels
 from pipeline.load_nuclear_data  import load_nuclear_data
 from pipeline.pixel_ids          import add_pixel_ids
 from pipeline.join_data          import join_data
@@ -44,7 +44,7 @@ def process_drug(drug: str, raw_dir: str) -> None:
     track_table_dir  = os.path.join(raw_dir, 'track_tables/')
     nuclear_data_dir = os.path.join(raw_dir, 'nuclear_segmentation_info/')
     seg_mask_dir     = raw_dir
-    klabels_path     = os.path.join(raw_dir, 'sorted_idx.mat')
+    labels_path      = os.path.join(raw_dir, 'sorted_idx.mat')
 
     # --- step 1: load cell track tables ---
     print("\n[1/7] Loading track tables...")
@@ -56,10 +56,10 @@ def process_drug(drug: str, raw_dir: str) -> None:
     df = load_track_table(track_files)
     print(f"  Loaded {len(df)} rows across {df['track'].nunique()} tracks ({time.time()-t:.1f}s)")
 
-    # --- step 2: append k-means labels ---
-    print("\n[2/7] Appending k-means labels...")
+    # --- step 2: append lineage classification labels ---
+    print("\n[2/7] Appending classification labels...")
     t = time.time()
-    df = append_klabels(df, klabels_path)
+    df = append_labels(df, labels_path)
     print(f"  Done ({time.time()-t:.1f}s)")
 
     # --- step 3: load nuclear data ---
@@ -94,7 +94,7 @@ def process_drug(drug: str, raw_dir: str) -> None:
 
     # --- export metadata ---
     print("\nExporting metadata...")
-    meta_cols = ['frame', 'node_id', 'pred_node_id', 'lin_id', 'pixel_id', 'has_mask', 'pixel_dup', 'mask_fail_reason', 'k_label']
+    meta_cols = ['frame', 'node_id', 'pred_node_id', 'lin_id', 'pixel_id', 'has_mask', 'pixel_dup', 'mask_fail_reason', 'm_label', 'k_label']
     out_path  = os.path.join(PROCESSED_DATA_DIR, f"{drug}_metadata.csv")
     df[meta_cols].to_csv(out_path, index=False)
     print(f"  Saved to {out_path}")
