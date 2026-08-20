@@ -35,7 +35,11 @@ def ind2sub_square(sz: int, ind: np.ndarray) -> np.ndarray:
     Outputs:
         idxs: (N x 2) array of 0-based [row, col] indices
     '''
-    ind0 = ind - 1          # convert from 1-based (MATLAB) to 0-based (Python)
-    row  = ind0 % sz        # row = remainder when dividing by matrix height
-    col  = ind0 // sz       # col = quotient when dividing by matrix height
+    # MATLAB stores PixelIdxList per-nucleus in the smallest integer dtype
+    # that fits that nucleus's own values (e.g. uint16 for a nucleus near
+    # the image's low-index edge), which can be narrower than sz - widen
+    # to int64 before doing arithmetic so this doesn't overflow.
+    ind0 = ind.astype(np.int64) - 1   # convert from 1-based (MATLAB) to 0-based (Python)
+    row  = ind0 % sz                  # row = remainder when dividing by matrix height
+    col  = ind0 // sz                 # col = quotient when dividing by matrix height
     return np.column_stack((row.astype(int), col.astype(int)))
