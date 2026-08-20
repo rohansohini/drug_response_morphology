@@ -4,7 +4,14 @@ import pandas as pd
 ###### Output Columns (additions):
 #  - pixel_idx_list:    (N x 2) array of 0-indexed [row, col] pixel indices for each nucleus
 #  - has_mask:          True if cell was matched to a nucleus and has a valid mask
-#  - mask_fail_reason:  reason for has_mask=False ('none', 'no_seg', 'no_nuc_match', 'pixel_dup', 'multi_nuc', 'multi_cell')
+#  - mask_fail_reason:  reason for has_mask=False, set here to one of:
+#                         'none'         — cell is valid so far
+#                         'no_nuc_match' — no nucleus found (no join match, NaN, or empty array)
+#                         'no_cell_seg'  — no cell segmentation label at the nucleus
+#                         'pixel_dup'    — pixel_id shared with another cell in the same (track, frame)
+#                       checks are applied in this order and the last one to match wins;
+#                       build_masks.py may later overwrite this with 'multi_nuc',
+#                       'nuc_outside_cell', or 'multi_cell'
 
 def is_missing_nucleus(x) -> bool:
     '''Return True if pixel_idx_list has no valid nucleus data.'''
