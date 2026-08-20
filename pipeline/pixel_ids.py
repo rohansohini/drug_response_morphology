@@ -17,14 +17,14 @@ def get_pixel_id(row: pd.Series, mask_img: np.ndarray, buffer: int = 0) -> np.fl
     Return the segmentation label at a cell's nucleus coordinates.
 
     Takes the mode of non-background pixels in a buffered region around
-    the nucleus. Returns NaN if no foreground pixels are found.
+    the nucleus. Returns 0 if no foreground pixels are found.
 
     Inputs:
         row:      track DataFrame row (must have: x_coord, y_coord)
         mask_img: segmentation mask as a NumPy array
         buffer:   pixel buffer around nucleus coordinate (default 0)
     Outputs:
-        pixel_id: segmentation label (mode of region), or NaN if empty
+        pixel_id: segmentation label (mode of region), or 0 if empty
     '''
     x = round(row['x_coord'])
     y = round(row['y_coord'])

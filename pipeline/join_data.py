@@ -4,7 +4,14 @@ import pandas as pd
 ###### Output Columns (additions):
 #  - pixel_idx_list:    (N x 2) array of 0-indexed [row, col] pixel indices for each nucleus
 #  - has_mask:          True if cell was matched to a nucleus and has a valid mask
-#  - mask_fail_reason:  reason for has_mask=False ('none', 'no_seg', 'no_nuc_match', 'pixel_dup', 'multi_nuc', 'multi_cell')
+#  - mask_fail_reason:  reason for has_mask=False, set here to one of:
+#                         'none'         — cell is valid so far
+#                         'no_nuc_match' — no nucleus found (no join match, NaN, or empty array)
+#                         'no_cell_seg'  — no cell segmentation label at the nucleus
+#                         'pixel_dup'    — pixel_id shared with another cell in the same (track, frame)
+#                       checks are applied in this order and the first one to match wins;
+#                       build_masks.py may later overwrite this with 'multi_nuc',
+#                       'nuc_outside_cell', or 'multi_cell'
 
 def is_missing_nucleus(x) -> bool:
     '''Return True if pixel_idx_list has no valid nucleus data.'''
@@ -44,18 +51,22 @@ def join_data(cell_df: pd.DataFrame, nuc_df: pd.DataFrame, round_precision: int 
     merged['has_mask']         = True
     merged['mask_fail_reason'] = 'none'
 
+    # checks below are applied in priority order (highest first); a cell already
+    # marked invalid by an earlier check keeps that reason even if a later
+    # check would also apply to it
+
     # no nucleus match (no entry or empty pixel_idx_list)
     no_nuc = merged['pixel_idx_list'].apply(is_missing_nucleus)
     merged.loc[no_nuc, 'has_mask']         = False
     merged.loc[no_nuc, 'mask_fail_reason'] = 'no_nuc_match'
 
     # no cell segmentation label
-    no_seg = merged['pixel_id'] == 0
+    no_seg = (merged['pixel_id'] == 0) & (merged['mask_fail_reason'] == 'none')
     merged.loc[no_seg, 'has_mask']         = False
     merged.loc[no_seg, 'mask_fail_reason'] = 'no_cell_seg'
-    
+
     # duplicate pixel ID
-    dup = merged['pixel_dup']
+    dup = merged['pixel_dup'] & (merged['mask_fail_reason'] == 'none')
     merged.loc[dup, 'has_mask']            = False
     merged.loc[dup, 'mask_fail_reason']    = 'pixel_dup'
 

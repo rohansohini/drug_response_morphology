@@ -229,7 +229,7 @@ def reassign_track_ids(
     return df, new_offset
 
 
-def build_masks(df: pd.DataFrame, direc: str, n_jobs: int = 8) -> tuple[pd.DataFrame, dict]:
+def build_masks(df: pd.DataFrame, direc: str, n_jobs: int = 8) -> tuple[pd.DataFrame, dict, np.dtype]:
     '''
     Resolve blobs, reassign pixel IDs, and return updated DataFrame and masks.
 
