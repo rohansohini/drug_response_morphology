@@ -12,7 +12,3 @@ __pycache__/
 # jupyter
 *.ipynb
 .ipynb_checkpoints/
-
-# local diagnostic/ad-hoc scripts, not part of the pipeline
-check_nuclear_segmentation.py
-nuclear_segmentation_report.txt
