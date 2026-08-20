@@ -44,7 +44,7 @@ Where:
 - `{drug_name}` — one folder per condition (e.g. `naive`, `vemurafenib`)
 - `track_table_XX.mat` — cell track data, one per track
 - `segmentation_info_XX.mat` — nuclear segmentation data, one per track
-- `sorted_idx.mat` — lineage classification labels (`CloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
+- `sorted_idx.mat` — lineage classification labels (`cloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
 - `transmission_region_XX/` — cell segmentation masks, one folder per track
 - `transmission_YY_masks.tiff` — segmentation mask, one per frame
 

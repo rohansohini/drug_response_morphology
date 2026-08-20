@@ -19,10 +19,10 @@ def append_labels(df: pd.DataFrame, labels_path: str) -> pd.DataFrame:
         df: input DataFrame with m_label and k_label columns added
     '''
     df         = df.copy()
-    class_data = pd.DataFrame(loadmat(labels_path)['CloneClassification'])
+    class_data = pd.DataFrame(loadmat(labels_path)['cloneClassification'])
 
     assert df['lin_id'].max() <= len(class_data), (
-        f"lin_id max ({df['lin_id'].max()}) exceeds CloneClassification length ({len(class_data)})"
+        f"lin_id max ({df['lin_id'].max()}) exceeds cloneClassification length ({len(class_data)})"
     )
 
     # map each lin_id to its label pair (lin_id is 1-indexed)
