@@ -108,7 +108,7 @@ def make_master_ids(df: pd.DataFrame) -> pd.DataFrame:
 
         df.loc[mask, 'pred_node_id'] = raw_pred.map(
             lambda pid: 0 if pid == 0 else local_to_global[pid]
-        )
+        ).astype('int32')
 
         # offset lin_id
         df.loc[mask, 'lin_id'] = df.loc[mask, 'lin_id'] + lin_offset
