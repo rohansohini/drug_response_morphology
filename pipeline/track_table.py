@@ -67,8 +67,13 @@ def make_master_ids(df: pd.DataFrame) -> pd.DataFrame:
     '''
     Replace within-track IDs with IDs that are unique across the entire dataset.
 
-    Within each track, node_id, pred_node_id, and lin_id all restart from 1.
-    This offsets each track so all IDs are globally unique.
+    node_id is reassigned globally by row position. lin_id is shifted by a
+    running per-track offset (a constant shift preserves uniqueness
+    regardless of any dropped rows). pred_node_id is resolved via an
+    explicit old-node_id -> new-node_id lookup per track, NOT a fixed
+    offset: load_track()'s dropna() can remove rows and leave gaps in a
+    track's raw node_id numbering, and a fixed offset assumes no gaps -
+    it silently mis-resolves any pred_node_id referencing a row after one.
 
     Inputs:
         df: concatenated track DataFrame (must have: node_id, pred_node_id, lin_id, track)
@@ -77,27 +82,37 @@ def make_master_ids(df: pd.DataFrame) -> pd.DataFrame:
     '''
     df = df.copy()
 
+    # raw, track-local node_id - node_id is about to be overwritten below,
+    # so pred_node_id (which references this raw numbering) must be
+    # resolved against it before that happens
+    local_node_id = df['node_id'].copy()
+
     # assign globally unique node_ids using row index (1-indexed)
     df['node_id'] = df.index + 1
 
-    node_offset = 0
-    lin_offset  = 0
+    lin_offset = 0
 
     for track in np.unique(df['track']):
         mask = df['track'] == track
 
-        # offset pred_node_id, keeping 0 for root nodes
-        df.loc[mask, 'pred_node_id'] = np.where(
-            df.loc[mask, 'pred_node_id'] == 0,
-            0,
-            df.loc[mask, 'pred_node_id'] + node_offset
+        local_to_global = dict(zip(local_node_id[mask], df.loc[mask, 'node_id']))
+
+        raw_pred = df.loc[mask, 'pred_node_id']
+        non_root = raw_pred[raw_pred != 0]
+        missing  = non_root[~non_root.isin(local_to_global)]
+        assert missing.empty, (
+            f"track {track}: pred_node_id value(s) {sorted(missing.unique().tolist())} "
+            f"reference a node_id not present among this track's own (post-dropna) rows - "
+            f"the true parent row was dropped, so this child's lineage can't be resolved"
+        )
+
+        df.loc[mask, 'pred_node_id'] = raw_pred.map(
+            lambda pid: 0 if pid == 0 else local_to_global[pid]
         )
 
         # offset lin_id
         df.loc[mask, 'lin_id'] = df.loc[mask, 'lin_id'] + lin_offset
-
-        node_offset = df.loc[mask, 'node_id'].max()
-        lin_offset  = df.loc[mask, 'lin_id'].max()
+        lin_offset = df.loc[mask, 'lin_id'].max()
 
     return df
 
