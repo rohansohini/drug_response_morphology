@@ -1,0 +1,20 @@
+name: drug_response_morphology
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
+  - tifffile
+  - joblib
+  - tqdm
+  - ipykernel
+  - umap-learn
+  - pip
+  - pip:
+      - cajal
+      - natsort

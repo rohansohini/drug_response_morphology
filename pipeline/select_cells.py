@@ -1,0 +1,61 @@
+import pandas as pd
+
+import config
+from helpers.classify import classify_subclass
+from pipeline.allocation import water_fill_allocate
+
+
+def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    '''
+    Select which cells go through CAJAL, from each condition's full metadata.
+
+    Restricted to has_mask=True rows (only real segmented cells can go
+    through mask extraction/CAJAL) and to frames present in EVERY
+    condition (a cell at a frame only one condition has can't be compared
+    across conditions, which is the whole point of this dataset).
+
+    config.TOTAL_CELL_BUDGET is split across conditions by
+    config.CONDITION_WEIGHTS, then water-filled (see pipeline/allocation.py)
+    within each condition across its own (frame, subclass) buckets - so a
+    bucket with fewer real cells than an equal share just contributes
+    everything it has, and the leftover goes to other buckets, rather than
+    demanding cells that don't exist.
+
+    Inputs:
+        metadata_by_condition: {condition: full metadata DataFrame (must
+                                have: frame, has_mask, m_label, k_label,
+                                pixel_id)}
+    Outputs:
+        selected: concatenated rows chosen across every condition, with a
+                  'condition' and 'subclass' column added
+                  (dying/persisting/slow_prolif/fast_prolif)
+    '''
+    overlapping_frames = None
+    for df in metadata_by_condition.values():
+        frames = set(df['frame'].unique())
+        overlapping_frames = frames if overlapping_frames is None else overlapping_frames & frames
+
+    assert overlapping_frames, "no frame numbers are shared across every condition - nothing to sample"
+
+    weight_sum = sum(config.CONDITION_WEIGHTS.values())
+    assert abs(weight_sum - 1.0) < 1e-6, f"config.CONDITION_WEIGHTS must sum to 1.0, got {weight_sum}"
+
+    selected_parts = []
+    for condition, df in metadata_by_condition.items():
+        weight = config.CONDITION_WEIGHTS[condition]
+        condition_budget = round(config.TOTAL_CELL_BUDGET * weight)
+
+        visible = df[df['has_mask'] & df['frame'].isin(overlapping_frames)].copy()
+        visible['condition'] = condition
+        visible['subclass']  = classify_subclass(visible)
+
+        bucket_sizes = visible.groupby(['frame', 'subclass']).size().to_dict()
+        bucket_allocation = water_fill_allocate(bucket_sizes, condition_budget)
+
+        for (frame, subclass), n in bucket_allocation.items():
+            if n == 0:
+                continue
+            bucket_df = visible[(visible['frame'] == frame) & (visible['subclass'] == subclass)]
+            selected_parts.append(bucket_df.sample(n=n, random_state=config.UMAP_SEED))
+
+    return pd.concat(selected_parts, ignore_index=True)
