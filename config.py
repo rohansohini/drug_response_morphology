@@ -1,11 +1,13 @@
 import os
 
 ###### Drug conditions
-#  Must exactly match the folder names process_imaging_data used under its
-#  raw_data/ (and therefore the {condition}_metadata.csv / mask filenames
-#  it produced).
-CONDITIONS     = ['naive', 'A1_1uM_vem']
-VEM_CONDITION  = 'A1_1uM_vem'
+#  Must exactly match process_imaging_data's own condition naming (it
+#  determines both the {condition}_metadata.csv filenames and the
+#  combined mask TIFF filenames) - confirmed against the real files:
+#  A2_naive_metadata.csv, A1_1uM_vem_metadata.csv.
+NAIVE_CONDITION = 'A2_naive'
+VEM_CONDITION   = 'A1_1uM_vem'
+CONDITIONS      = [NAIVE_CONDITION, VEM_CONDITION]
 
 ###### Subcluster classification
 #  m_label: 1 = dying, 2 = persister, 3 = proliferator (see
@@ -22,7 +24,7 @@ FAST_K_LABELS      = [3, 4, 5, 6]
 #  water-filled within each condition across its own (frame, subclass)
 #  buckets - see pipeline/allocation.py and pipeline/select_cells.py.
 TOTAL_CELL_BUDGET = 30_000
-CONDITION_WEIGHTS = {'naive': 0.2, 'A1_1uM_vem': 0.8}   # must sum to 1.0
+CONDITION_WEIGHTS = {NAIVE_CONDITION: 0.2, VEM_CONDITION: 0.8}   # must sum to 1.0
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own

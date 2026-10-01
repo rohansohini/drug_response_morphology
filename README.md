@@ -56,7 +56,7 @@ drug_response_morphology/
 
 ## Prerequisites
 
-- `process_imaging_data` has already been run for both the `naive` and `A1_1uM_vem` conditions, producing `{condition}_metadata.csv` and `combined_masks/` under its own `processed_data/`.
+- `process_imaging_data` has already been run for both conditions (`A2_naive` and `A1_1uM_vem` - see `config.CONDITIONS`), producing `{condition}_metadata.csv` (e.g. `A2_naive_metadata.csv`) and `combined_masks/` under its own `processed_data/`.
 - `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that repo's location (`/gpfs/projects/b1042/GoyalLab/sohini/process_imaging_data`).
 
 ---
@@ -104,7 +104,7 @@ Everything you're likely to want to change lives in `config.py`:
 
 | Setting | Meaning |
 |---|---|
-| `CONDITIONS`, `VEM_CONDITION` | drug condition names - must match `process_imaging_data`'s folder/metadata naming exactly |
+| `CONDITIONS`, `NAIVE_CONDITION`, `VEM_CONDITION` | drug condition names - must match `process_imaging_data`'s metadata filenames exactly (`A2_naive`, `A1_1uM_vem`) |
 | `TOTAL_CELL_BUDGET` | total cells sampled for CAJAL across both conditions (default 30,000) |
 | `CONDITION_WEIGHTS` | how the budget splits across conditions (default 80% vem / 20% naive) |
 | `DYING_M_LABEL` / `PERSISTING_M_LABEL` / `PROLIF_M_LABEL`, `SLOW_K_LABELS` / `FAST_K_LABELS` | the classification scheme (see below) |

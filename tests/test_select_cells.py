@@ -11,6 +11,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import config
 from pipeline.select_cells import select_cells
 
+# tests below use config.NAIVE_CONDITION/config.VEM_CONDITION rather than
+# hardcoded strings, so they keep working if the real condition names ever
+# change again (as they already did once - process_imaging_data's naive
+# condition turned out to be 'A2_naive', not 'naive')
+NAIVE = config.NAIVE_CONDITION
+VEM   = config.VEM_CONDITION
+
 
 def make_condition_metadata(rng, condition_label, frames, n_per_frame, pixel_id_start):
     '''
@@ -50,10 +57,10 @@ def test_respects_condition_weights_and_overlapping_frames():
     # 24000 for vem) within that 6-frame overlap - otherwise both sides
     # just hand over everything they have (correct water-filling behavior,
     # but it tests capacity-capping, not weight-respecting allocation).
-    naive_df = make_condition_metadata(rng, 'naive', range(1, 11), n_per_frame=5000, pixel_id_start=1)
-    vem_df   = make_condition_metadata(rng, 'A1_1uM_vem', range(5, 16), n_per_frame=5000, pixel_id_start=10_000_000)
+    naive_df = make_condition_metadata(rng, NAIVE, range(1, 11), n_per_frame=5000, pixel_id_start=1)
+    vem_df   = make_condition_metadata(rng, VEM, range(5, 16), n_per_frame=5000, pixel_id_start=10_000_000)
 
-    selected = select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+    selected = select_cells({NAIVE: naive_df, VEM: vem_df})
 
     # only overlapping frames (5-10) should ever appear
     assert set(selected['frame'].unique()).issubset(set(range(5, 11)))
@@ -65,8 +72,8 @@ def test_respects_condition_weights_and_overlapping_frames():
 
     # both conditions now have ample availability, so the condition split
     # should closely track config.CONDITION_WEIGHTS (0.2 / 0.8)
-    n_naive = (selected['condition'] == 'naive').sum()
-    n_vem   = (selected['condition'] == 'A1_1uM_vem').sum()
+    n_naive = (selected['condition'] == NAIVE).sum()
+    n_vem   = (selected['condition'] == VEM).sum()
     total   = n_naive + n_vem
     assert total > 0
     naive_fraction = n_naive / total
@@ -78,10 +85,10 @@ def test_respects_condition_weights_and_overlapping_frames():
 
 def test_rare_subclass_not_starved_or_overrepresented():
     rng = np.random.default_rng(1)
-    naive_df = make_condition_metadata(rng, 'naive', range(1, 6), n_per_frame=200, pixel_id_start=1)
-    vem_df   = make_condition_metadata(rng, 'A1_1uM_vem', range(1, 6), n_per_frame=200, pixel_id_start=1_000_000)
+    naive_df = make_condition_metadata(rng, NAIVE, range(1, 6), n_per_frame=200, pixel_id_start=1)
+    vem_df   = make_condition_metadata(rng, VEM, range(1, 6), n_per_frame=200, pixel_id_start=1_000_000)
 
-    selected = select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+    selected = select_cells({NAIVE: naive_df, VEM: vem_df})
 
     # dying cells are rare by construction (~5% of the population) - the
     # selection should include some, but water-filling means they won't be
@@ -98,7 +105,7 @@ def test_no_overlapping_frames_raises():
     vem_df   = pd.DataFrame({'frame': [10, 11], 'pixel_id': [1, 2], 'm_label': [3, 3], 'k_label': [4, 4], 'has_mask': [True, True]})
 
     try:
-        select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+        select_cells({NAIVE: naive_df, VEM: vem_df})
     except AssertionError as e:
         assert 'overlap' in str(e).lower() or 'shared' in str(e).lower()
         print("PASS: no overlapping frames raises clearly instead of silently returning nothing useful")
@@ -110,10 +117,10 @@ def test_total_selected_respects_budget_when_capacity_allows():
     rng = np.random.default_rng(2)
     # both conditions need enough availability to clear vem's 24000 target
     # (the larger of the two) - see the sizing note in the weights test above
-    naive_df = make_condition_metadata(rng, 'naive', range(1, 7), n_per_frame=5000, pixel_id_start=1)
-    vem_df   = make_condition_metadata(rng, 'A1_1uM_vem', range(1, 7), n_per_frame=5000, pixel_id_start=1_000_000)
+    naive_df = make_condition_metadata(rng, NAIVE, range(1, 7), n_per_frame=5000, pixel_id_start=1)
+    vem_df   = make_condition_metadata(rng, VEM, range(1, 7), n_per_frame=5000, pixel_id_start=1_000_000)
 
-    selected = select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+    selected = select_cells({NAIVE: naive_df, VEM: vem_df})
 
     # with ample data available in every bucket, total should land close to
     # config.TOTAL_CELL_BUDGET (small rounding slack from per-condition/
@@ -160,14 +167,14 @@ def test_sampling_is_independent_across_equal_sized_buckets():
     # present, since different n naturally gives different draws regardless.
     original_budget, original_weights = config.TOTAL_CELL_BUDGET, config.CONDITION_WEIGHTS
     config.TOTAL_CELL_BUDGET = 1000
-    config.CONDITION_WEIGHTS = {'naive': 0.0, 'A1_1uM_vem': 1.0}
+    config.CONDITION_WEIGHTS = {NAIVE: 0.0, VEM: 1.0}
     try:
-        selected = select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+        selected = select_cells({NAIVE: naive_df, VEM: vem_df})
     finally:
         config.TOTAL_CELL_BUDGET, config.CONDITION_WEIGHTS = original_budget, original_weights
 
-    frame1 = selected[(selected['condition'] == 'A1_1uM_vem') & (selected['frame'] == 1)]
-    frame2 = selected[(selected['condition'] == 'A1_1uM_vem') & (selected['frame'] == 2)]
+    frame1 = selected[(selected['condition'] == VEM) & (selected['frame'] == 1)]
+    frame2 = selected[(selected['condition'] == VEM) & (selected['frame'] == 2)]
 
     assert len(frame1) == len(frame2) == 500, (
         f"test setup expected an exact even 500/500 split, got {len(frame1)} and {len(frame2)} - "
@@ -194,7 +201,7 @@ def test_missing_condition_weight_raises_clearly():
     unknown_df = pd.DataFrame({'frame': [1], 'pixel_id': [1], 'm_label': [3], 'k_label': [4], 'has_mask': [True]})
 
     try:
-        select_cells({'naive': naive_df, 'some_new_condition': unknown_df})
+        select_cells({NAIVE: naive_df, 'some_new_condition': unknown_df})
     except AssertionError as e:
         assert 'some_new_condition' in str(e) and 'CONDITION_WEIGHTS' in str(e)
         print("PASS: a condition missing from config.CONDITION_WEIGHTS raises a clear error, not a bare KeyError")
