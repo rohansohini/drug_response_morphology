@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=p32655
+#SBATCH --account=b1042
 #SBATCH --partition=normal
 #SBATCH --nodes=1
 #SBATCH --ntasks=32
@@ -14,11 +14,9 @@
 # log after the first real run and adjust before resubmitting; if it times
 # out, main.py's existing skip-if-exists checks (per mask type, per
 # embedding) mean a re-submitted job resumes instead of restarting from
-# scratch. --account/--partition are carried over from
-# process_imaging_data's slurm_submit.sh (same lab/user, confirmed compute
-# account) - the working directory below uses the confirmed
-# /gpfs/projects/b1042/GoyalLab/sohini/ filesystem path, which is separate
-# from the SLURM compute account.
+# scratch. --partition is carried over from process_imaging_data's
+# slurm_submit.sh (same lab/user) - confirm "normal" is right for a job
+# this long before relying on it.
 
 module purge
 eval "$(conda shell.bash hook)"
