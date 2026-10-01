@@ -6,11 +6,9 @@ import tifffile
 from tqdm import tqdm
 from joblib import Parallel, delayed
 
-###### Ported unchanged from vem_fast_prolif_cajal/extract_masks.py
-#  (itself copied unchanged from cancer_morphology_analysis/sampling_pipeline/extract_masks.py)
-#  Selection logic lives in pipeline/select_cells.py instead of a random
-#  draw - this function itself doesn't care how the selection was made, it
-#  just needs a DataFrame with a 'sampled' column.
+###### Selection logic lives in pipeline/select_cells.py - this function
+#  itself doesn't care how the selection was made, it just needs a
+#  DataFrame with a 'sampled' column.
 
 ###### Output:
 #  - two single-layer TIFFs per frame (cell, nuc), zeroed to only the

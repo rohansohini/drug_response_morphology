@@ -3,8 +3,6 @@ import os
 from cajal import sample_seg
 from cajal.qgw import quantized_gw_parallel
 
-###### Ported unchanged from vem_fast_prolif_cajal/cajal_pipeline/run_cajal.py
-
 
 def run_cajal(
     infolder:   str,

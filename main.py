@@ -67,7 +67,7 @@ def main():
         print(f"  Processing {len(tasks)} mask type(s) in parallel ({half_jobs} jobs each)...")
         Parallel(n_jobs=len(tasks))(tasks)
 
-    # --- step 4: fit UMAP directly on the CAJAL distances - no Isomap ---
+    # --- step 4: fit UMAP directly on the CAJAL distances ---
     print("\n[4/4] Fitting UMAP embeddings...")
     cell_umap_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_umap.npz')
     nuc_umap_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_umap.npz')

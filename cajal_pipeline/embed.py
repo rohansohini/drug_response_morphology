@@ -7,11 +7,6 @@ import umap
 
 import cajal.utilities
 
-###### reformat_name copied unchanged from vem_fast_prolif_cajal/cajal_pipeline/embed.py.
-#  get_umap_embedding is NEW: fits UMAP directly on the CAJAL GW distance
-#  matrix (metric='precomputed') - deliberately no Isomap step in between,
-#  unlike vem_fast_prolif_cajal's embed.py.
-
 
 def reformat_name(name: str) -> str:
     '''
@@ -31,8 +26,8 @@ def reformat_name(name: str) -> str:
 
 def get_umap_embedding(dist_csv: str, out_path: str, seed: int = 42) -> tuple[list[str], np.ndarray]:
     '''
-    Fit a 2D UMAP directly on a CAJAL quantized-GW distance matrix - no
-    Isomap step. Skips computation if the output file already exists.
+    Fit a 2D UMAP directly on a CAJAL quantized-GW distance matrix.
+    Skips computation if the output file already exists.
 
     Inputs:
         dist_csv: path to a *_qgw_*_dists.csv file (cell or nuc), covering
@@ -56,7 +51,7 @@ def get_umap_embedding(dist_csv: str, out_path: str, seed: int = 42) -> tuple[li
     labels = [reformat_name(n) for n in names]
     print(f"  Loaded {len(labels)} points ({time.time() - t0:.1f}s)")
 
-    print("  Fitting UMAP (precomputed distance, no Isomap)...")
+    print("  Fitting UMAP (precomputed distance)...")
     t0 = time.time()
     reducer   = umap.UMAP(n_components=2, metric='precomputed', random_state=seed)
     embedding = reducer.fit_transform(dist_matrix)

@@ -47,6 +47,5 @@ N_POINTS   = 100   # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 25    # clusters for quantized GW
 
 ###### UMAP parameters
-#  Fit directly on the CAJAL GW distance matrix (metric='precomputed') -
-#  deliberately no Isomap step.
+#  Fit directly on the CAJAL GW distance matrix (metric='precomputed').
 UMAP_SEED = 42

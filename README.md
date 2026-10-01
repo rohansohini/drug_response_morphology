@@ -1,6 +1,6 @@
 # drug_response_morphology
 
-Compares cell and nuclear morphology between `naive` and `A1_1uM_vem` conditions over time, using [CAJAL](https://github.com/CamaraLab/CAJAL) Gromov-Wasserstein shape distances and UMAP (no Isomap step).
+Compares cell and nuclear morphology between `naive` and `A1_1uM_vem` conditions over time, using [CAJAL](https://github.com/CamaraLab/CAJAL) Gromov-Wasserstein shape distances and UMAP.
 
 ---
 
@@ -8,7 +8,7 @@ Compares cell and nuclear morphology between `naive` and `A1_1uM_vem` conditions
 
 1. **Selects cells** for CAJAL from `process_imaging_data`'s metadata, across both conditions and every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and sampled with an 80/20 vem/naive budget split.
 2. **Runs CAJAL** once per modality (cell, nucleus) on the combined selection, so every selected cell's shape distance is comparable to every other's.
-3. **Fits UMAP directly on the CAJAL distance matrix** (`metric='precomputed'`) - deliberately no Isomap step.
+3. **Fits UMAP directly on the CAJAL distance matrix** (`metric='precomputed'`).
 4. **Three notebooks** read that one shared embedding and plot different comparisons:
    - `01_umap_by_condition_over_time.ipynb` - every cell, every subclass, KDE per condition
    - `02_proliferators_vem_vs_naive.ipynb` - proliferators only (`m_label == 3`), KDE per condition
