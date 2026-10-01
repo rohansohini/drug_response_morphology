@@ -2,7 +2,8 @@
 #SBATCH --account=b1042
 #SBATCH --partition=genomics
 #SBATCH --nodes=1
-#SBATCH --ntasks=52
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=52
 #SBATCH --mem=192G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=drug_response_morphology
