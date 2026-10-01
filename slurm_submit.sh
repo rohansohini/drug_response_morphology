@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=b1042
-#SBATCH --partition=normal
+#SBATCH --partition=b1042
 #SBATCH --nodes=1
 #SBATCH --ntasks=64
 #SBATCH --mem=128G
