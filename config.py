@@ -42,9 +42,9 @@ def metadata_csv_path(condition: str) -> str:
 
 ###### Mask extraction / CAJAL parameters
 PAD_SIZE   = 200   # pixels of zero-padding added to each side of extracted masks
-N_JOBS     = 32    # parallel jobs for mask extraction / CAJAL
-N_POINTS   = 100   # points sampled per cell for CAJAL's icdm
-N_CLUSTERS = 25    # clusters for quantized GW
+N_JOBS     = 64    # parallel jobs for mask extraction / CAJAL
+N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
+N_CLUSTERS = 20    # clusters for quantized GW
 
 ###### UMAP parameters
 #  Fit directly on the CAJAL GW distance matrix (metric='precomputed').
