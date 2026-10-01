@@ -16,3 +16,6 @@ output/
 *.npz
 *.tiff
 *.tif
+
+# SLURM job logs
+logs/
