@@ -41,6 +41,19 @@ def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFra
     df['umap_1'] = embedding[:, 1]
 
     meta = selected[['condition', 'frame', 'pixel_id', 'subclass', 'm_label', 'k_label']]
+
+    # a duplicate (condition, frame, pixel_id) key in meta would silently
+    # fan out matching rows in the merge below (confirmed directly: a
+    # left-merge against a non-unique key duplicates the embedded cell's
+    # row rather than raising, and introduces no NaN - so the n_unmatched
+    # check further down would NOT catch it) - check uniqueness explicitly
+    # instead of relying on that check to catch this class of bug too
+    n_dup_keys = meta.duplicated(['condition', 'frame', 'pixel_id']).sum()
+    assert n_dup_keys == 0, (
+        f"{n_dup_keys} duplicate (condition, frame, pixel_id) key(s) in `selected` metadata - "
+        f"the merge below would silently duplicate rows for those cells rather than erroring"
+    )
+
     df = df.merge(meta, on=['condition', 'frame', 'pixel_id'], how='left')
 
     n_unmatched = df['subclass'].isna().sum()

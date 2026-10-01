@@ -126,9 +126,87 @@ def test_total_selected_respects_budget_when_capacity_allows():
           f"({config.TOTAL_CELL_BUDGET}) when every bucket has ample data")
 
 
+def test_sampling_is_independent_across_equal_sized_buckets():
+    '''
+    Regression test: select_cells previously passed the same fixed int
+    seed to every bucket's .sample() call, which (confirmed directly,
+    before fixing) makes pandas pick the exact same RELATIVE row
+    positions from any two equal-sized buckets - a real risk of
+    correlated, non-independent sampling if the underlying rows have any
+    structural ordering (e.g. sorted by pixel_id). Builds two
+    equal-sized, equal-allocation vem buckets (frame 1 and frame 2, both
+    all fast_prolif, pixel_id sorted ascending within each) and checks
+    the selected pixel_ids are NOT at identical relative ranks within
+    their bucket.
+    '''
+    naive_df = pd.DataFrame({
+        'frame': [1, 2], 'pixel_id': [1, 2], 'm_label': [3, 3], 'k_label': [4, 4], 'has_mask': [True, True],
+    })
+
+    bucket_size = 1000
+    rows = []
+    for frame, pixel_start in [(1, 0), (2, 100_000)]:
+        for i in range(bucket_size):
+            rows.append({'frame': frame, 'pixel_id': pixel_start + i, 'm_label': 3, 'k_label': 4, 'has_mask': True})
+    vem_df = pd.DataFrame(rows)
+
+    # TOTAL_CELL_BUDGET=1000 with vem getting the whole budget (weight 1.0)
+    # and two equal-sized (1000-cell) buckets divides EXACTLY in half
+    # (500/500, no leftover remainder) - this is deliberate: the bug this
+    # test targets only manifests when both buckets get the exact same n,
+    # since .sample(n=k, random_state=<same int>) only picks identical
+    # positions when both k and the seed match. An uneven split (e.g. from
+    # allocation.py's leftover redistribution) would mask the bug even if
+    # present, since different n naturally gives different draws regardless.
+    original_budget, original_weights = config.TOTAL_CELL_BUDGET, config.CONDITION_WEIGHTS
+    config.TOTAL_CELL_BUDGET = 1000
+    config.CONDITION_WEIGHTS = {'naive': 0.0, 'A1_1uM_vem': 1.0}
+    try:
+        selected = select_cells({'naive': naive_df, 'A1_1uM_vem': vem_df})
+    finally:
+        config.TOTAL_CELL_BUDGET, config.CONDITION_WEIGHTS = original_budget, original_weights
+
+    frame1 = selected[(selected['condition'] == 'A1_1uM_vem') & (selected['frame'] == 1)]
+    frame2 = selected[(selected['condition'] == 'A1_1uM_vem') & (selected['frame'] == 2)]
+
+    assert len(frame1) == len(frame2) == 500, (
+        f"test setup expected an exact even 500/500 split, got {len(frame1)} and {len(frame2)} - "
+        f"fix the budget numbers above so this test actually isolates the seeding behavior"
+    )
+
+    rank1 = sorted((frame1['pixel_id'] - 0).tolist())
+    rank2 = sorted((frame2['pixel_id'] - 100_000).tolist())
+
+    assert rank1 != rank2, (
+        "selected relative positions are IDENTICAL across two equal-sized buckets - "
+        "sampling is not independent per bucket (same-seed regression)"
+    )
+
+    print(f"PASS: two equal-sized, equal-allocation buckets ({len(frame1)} cells each) picked "
+          f"different relative positions - sampling is independent per bucket")
+
+
+def test_missing_condition_weight_raises_clearly():
+    # 'some_new_condition' is deliberately not a key in the real
+    # config.CONDITION_WEIGHTS, to simulate someone adding a condition to
+    # config.CONDITIONS without updating CONDITION_WEIGHTS to match
+    naive_df   = pd.DataFrame({'frame': [1], 'pixel_id': [1], 'm_label': [3], 'k_label': [4], 'has_mask': [True]})
+    unknown_df = pd.DataFrame({'frame': [1], 'pixel_id': [1], 'm_label': [3], 'k_label': [4], 'has_mask': [True]})
+
+    try:
+        select_cells({'naive': naive_df, 'some_new_condition': unknown_df})
+    except AssertionError as e:
+        assert 'some_new_condition' in str(e) and 'CONDITION_WEIGHTS' in str(e)
+        print("PASS: a condition missing from config.CONDITION_WEIGHTS raises a clear error, not a bare KeyError")
+        return
+    raise AssertionError("expected select_cells to raise for a condition with no configured weight")
+
+
 if __name__ == '__main__':
     test_respects_condition_weights_and_overlapping_frames()
     test_rare_subclass_not_starved_or_overrepresented()
     test_no_overlapping_frames_raises()
     test_total_selected_respects_budget_when_capacity_allows()
+    test_sampling_is_independent_across_equal_sized_buckets()
+    test_missing_condition_weight_raises_clearly()
     print("\nAll tests passed.")

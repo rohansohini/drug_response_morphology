@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 import config
@@ -40,6 +41,24 @@ def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame
     weight_sum = sum(config.CONDITION_WEIGHTS.values())
     assert abs(weight_sum - 1.0) < 1e-6, f"config.CONDITION_WEIGHTS must sum to 1.0, got {weight_sum}"
 
+    missing_weights = set(metadata_by_condition) - set(config.CONDITION_WEIGHTS)
+    assert not missing_weights, (
+        f"condition(s) {missing_weights} have no entry in config.CONDITION_WEIGHTS - "
+        f"add a weight for every condition in config.CONDITIONS"
+    )
+
+    # a single shared Generator, not a fixed int, is passed to every
+    # .sample() call below - passing the same int to pandas .sample()
+    # reseeds a fresh RandomState each call, so any two buckets of equal
+    # size would deterministically pick the exact same RELATIVE row
+    # positions (confirmed directly) - a real risk of correlated,
+    # non-independent sampling if the underlying metadata rows have any
+    # structural ordering (e.g. sorted by pixel_id). A shared Generator
+    # object instead carries its state across calls, giving each bucket an
+    # independent draw while the whole selection stays fully reproducible
+    # for a given config.UMAP_SEED.
+    rng = np.random.default_rng(config.UMAP_SEED)
+
     selected_parts = []
     for condition, df in metadata_by_condition.items():
         weight = config.CONDITION_WEIGHTS[condition]
@@ -56,6 +75,6 @@ def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame
             if n == 0:
                 continue
             bucket_df = visible[(visible['frame'] == frame) & (visible['subclass'] == subclass)]
-            selected_parts.append(bucket_df.sample(n=n, random_state=config.UMAP_SEED))
+            selected_parts.append(bucket_df.sample(n=n, random_state=rng))
 
     return pd.concat(selected_parts, ignore_index=True)

@@ -51,21 +51,32 @@ def main():
     cell_dist_csv = os.path.join(config.CAJAL_OUTPUT_DIR, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
     nuc_dist_csv  = os.path.join(config.CAJAL_OUTPUT_DIR, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
 
-    half_jobs = max(1, config.N_JOBS // 2)
-    tasks = []
-    if os.path.exists(cell_dist_csv):
-        print(f"  Skipping cell CAJAL run: {cell_dist_csv} already exists")
-    else:
-        tasks.append(delayed(run_cajal)(cell_dir, config.CAJAL_OUTPUT_DIR, 'cell', config.N_POINTS, half_jobs, config.N_CLUSTERS))
+    # figure out how many of {cell, nuc} actually need to run BEFORE
+    # deciding how many cores to give each one - splitting config.N_JOBS in
+    # half unconditionally would waste half the allocation whenever only
+    # one of the two is still needed (e.g. resuming after a partial run
+    # that already finished one modality)
+    needs_cajal = {
+        'cell': not os.path.exists(cell_dist_csv),
+        'nuc':  not os.path.exists(nuc_dist_csv),
+    }
+    for modality, needed in needs_cajal.items():
+        if not needed:
+            dist_csv = cell_dist_csv if modality == 'cell' else nuc_dist_csv
+            print(f"  Skipping {modality} CAJAL run: {dist_csv} already exists")
 
-    if os.path.exists(nuc_dist_csv):
-        print(f"  Skipping nuclear CAJAL run: {nuc_dist_csv} already exists")
-    else:
-        tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, half_jobs, config.N_CLUSTERS))
+    n_tasks = sum(needs_cajal.values())
+    if n_tasks > 0:
+        per_task_jobs = max(1, config.N_JOBS // n_tasks)
+        print(f"  Processing {n_tasks} mask type(s) in parallel ({per_task_jobs} jobs each)...")
 
-    if tasks:
-        print(f"  Processing {len(tasks)} mask type(s) in parallel ({half_jobs} jobs each)...")
-        Parallel(n_jobs=len(tasks))(tasks)
+        tasks = []
+        if needs_cajal['cell']:
+            tasks.append(delayed(run_cajal)(cell_dir, config.CAJAL_OUTPUT_DIR, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+        if needs_cajal['nuc']:
+            tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+
+        Parallel(n_jobs=n_tasks)(tasks)
 
     # --- step 4: fit UMAP directly on the CAJAL distances ---
     print("\n[4/4] Fitting UMAP embeddings...")

@@ -56,8 +56,35 @@ def test_build_dataset_raises_on_unmatched_cell():
     raise AssertionError("expected build_dataset to raise on an unmatched cell")
 
 
+def test_build_dataset_raises_on_duplicate_metadata_key():
+    # regression test: a duplicate (condition, frame, pixel_id) key in
+    # `selected` would otherwise silently fan out rows in the merge
+    # (confirmed directly: a left-merge against a non-unique key
+    # duplicates the embedded cell's row with no NaN introduced, so the
+    # unmatched-cell check above does NOT catch this class of bug)
+    labels = ['naive_frame_1_pixel_1']
+    embedding = np.array([[0.1, 0.2]])
+    selected = pd.DataFrame({
+        'condition': ['naive', 'naive'],       # same key twice
+        'frame':     [1, 1],
+        'pixel_id':  [1, 1],
+        'subclass':  ['fast_prolif', 'dying'],
+        'm_label':   [3, 1],
+        'k_label':   [4, 2],
+    })
+
+    try:
+        build_dataset(labels, embedding, selected)
+    except AssertionError as e:
+        assert 'duplicate' in str(e).lower()
+        print("PASS: build_dataset raises clearly on a duplicate metadata key, instead of silently duplicating rows")
+        return
+    raise AssertionError("expected build_dataset to raise on a duplicate (condition, frame, pixel_id) key")
+
+
 if __name__ == '__main__':
     test_parse_label_handles_underscores_in_condition_name()
     test_build_dataset_merges_correctly()
     test_build_dataset_raises_on_unmatched_cell()
+    test_build_dataset_raises_on_duplicate_metadata_key()
     print("\nAll tests passed.")
