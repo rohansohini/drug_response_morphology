@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=b1042
-#SBATCH --partition=b1042
+#SBATCH --partition=genomics
 #SBATCH --nodes=1
-#SBATCH --ntasks=64
-#SBATCH --mem=128G
+#SBATCH --ntasks=52
+#SBATCH --mem=192G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=drug_response_morphology
 #SBATCH --output=./logs/drug_response_morphology_%j.out
