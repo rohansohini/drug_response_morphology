@@ -2,7 +2,7 @@
 #SBATCH --account=b1042
 #SBATCH --partition=normal
 #SBATCH --nodes=1
-#SBATCH --ntasks=32
+#SBATCH --ntasks=64
 #SBATCH --mem=128G
 #SBATCH --time=24:00:00
 #SBATCH --job-name=drug_response_morphology
