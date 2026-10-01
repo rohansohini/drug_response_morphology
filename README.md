@@ -37,7 +37,18 @@ drug_response_morphology/
 │   └── density_plots.py         # shared KDE-over-UMAP plotting
 ├── analysis/                    # the three notebooks (step 4)
 ├── tests/                       # unit tests - no real data needed, run anywhere
-├── output/                      # generated - masks, CAJAL distances, embeddings, plots (gitignored)
+├── output/                      # generated (gitignored)
+│   ├── masks/, cajal_output/    # masks, CAJAL distances, UMAP embeddings
+│   └── plots/
+│       ├── 01_umap_by_condition_over_time/
+│       │   ├── pdfs/            # one PDF per frame, e.g. cell_frame_01.pdf
+│       │   └── svgs/            # matching SVG per frame
+│       ├── 02_proliferators_vem_vs_naive/
+│       │   ├── pdfs/
+│       │   └── svgs/
+│       └── 03_vem_subclasses_over_time/
+│           ├── pdfs/
+│           └── svgs/
 └── logs/                        # generated - SLURM job logs (gitignored)
 ```
 
@@ -76,7 +87,7 @@ python main.py
 
 **Step 2 - the analysis notebooks:**
 
-Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `cell_umap.npz`, and `nuc_umap.npz` all exist), open the notebooks in `analysis/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot. Each one writes its PDF output to `output/plots/`.
+Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `cell_umap.npz`, and `nuc_umap.npz` all exist), open the notebooks in `analysis/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot. Each notebook writes to its own folder under `output/plots/`, with a `pdfs/` and a matching `svgs/` subfolder (one PDF and one SVG per frame, e.g. `cell_frame_01.pdf` / `cell_frame_01.svg`).
 
 ---
 

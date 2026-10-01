@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from helpers.density_plots import plot_umap_with_kde
+from helpers.density_plots import plot_umap_with_kde, export_kde_by_frame
 
 
 def test_legend_shows_well_sampled_groups_only():
@@ -47,6 +47,39 @@ def test_legend_shows_well_sampled_groups_only():
     print("PASS: legend shows exactly the well-sampled groups, with real labels (not empty/auto-generated)")
 
 
+def test_export_kde_by_frame_writes_matching_pdf_and_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
+    import shutil
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for frame in [1, 2, 3]:
+        for cond, offset in [('naive', 0), ('A1_1uM_vem', 5)]:
+            for _ in range(10):
+                rows.append({'frame': frame, 'condition': cond,
+                             'umap_0': rng.normal(offset, 1), 'umap_1': rng.normal(offset, 1)})
+    df = pd.DataFrame(rows)
+
+    export_kde_by_frame(df, 'condition', {'naive': 'tab:blue', 'A1_1uM_vem': 'tab:red'},
+                         tmp_dir, 'cell')
+
+    pdf_dir = os.path.join(tmp_dir, 'pdfs')
+    svg_dir = os.path.join(tmp_dir, 'svgs')
+    expected_pdfs = {f'cell_frame_0{f}.pdf' for f in [1, 2, 3]}
+    expected_svgs = {f'cell_frame_0{f}.svg' for f in [1, 2, 3]}
+
+    assert set(os.listdir(pdf_dir)) == expected_pdfs, f"got {os.listdir(pdf_dir)}"
+    assert set(os.listdir(svg_dir)) == expected_svgs, f"got {os.listdir(svg_dir)}"
+    for f in expected_pdfs | expected_svgs:
+        folder = pdf_dir if f.endswith('.pdf') else svg_dir
+        assert os.path.getsize(os.path.join(folder, f)) > 0, f"{f} is empty"
+
+    shutil.rmtree(tmp_dir)
+    print("PASS: export_kde_by_frame writes one matching PDF and SVG per frame, in separate subfolders")
+
+
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
+    test_export_kde_by_frame_writes_matching_pdf_and_svg_per_frame()
     print("\nAll tests passed.")
