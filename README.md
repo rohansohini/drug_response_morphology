@@ -68,6 +68,13 @@ conda env create -f environment.yml
 conda activate drug_response_morphology
 ```
 
+If `mamba` is available (`mamba --version`), use it instead - it's a drop-in replacement that reads this same `environment.yml` but resolves dependencies much faster:
+
+```bash
+mamba env create -f environment.yml
+conda activate drug_response_morphology
+```
+
 ---
 
 ## Running the pipeline
