@@ -8,15 +8,6 @@
 #SBATCH --job-name=drug_response_morphology
 #SBATCH --output=./logs/drug_response_morphology_%j.out
 
-# NOTE: --time and --mem are rough, UNVALIDATED estimates - there's no
-# empirical runtime benchmark yet for CAJAL + UMAP at this repo's scale
-# (up to 30,000 cells across two conditions and two modalities). Check the
-# log after the first real run and adjust before resubmitting; if it times
-# out, main.py's existing skip-if-exists checks (per mask type, per
-# embedding) mean a re-submitted job resumes instead of restarting from
-# scratch. Confirm "normal" is the right partition for a job this long
-# before relying on it.
-
 module purge
 eval "$(conda shell.bash hook)"
 
