@@ -11,6 +11,7 @@ from pipeline.pixel_ids          import add_pixel_ids
 from pipeline.join_data          import join_data
 from pipeline.build_masks        import build_masks
 from pipeline.combine_tracks     import combine_tracks
+from pipeline.utils.image_utils  import save_failure_examples
 
 ##############################################################
 # CONSTANTS — edit these to match your directory structure
@@ -91,6 +92,10 @@ def process_drug(drug: str, raw_dir: str) -> None:
     t = time.time()
     combine_tracks(df, masks, drug, COMBINED_MASKS_DIR, dtype, img_size=IMG_SIZE)
     print(f"  Done ({time.time()-t:.1f}s)")
+
+    # --- save a few failure example crops for visual inspection ---
+    failure_examples_dir = os.path.join(PROCESSED_DATA_DIR, 'failure_examples', drug)
+    save_failure_examples(df, seg_mask_dir, drug, failure_examples_dir)
 
     # --- export metadata ---
     print("\nExporting metadata...")
