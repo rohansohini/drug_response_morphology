@@ -176,57 +176,72 @@ def process_group(group: pd.DataFrame, direc: str) -> tuple[pd.DataFrame, np.nda
     return group, np.stack([cell_mask, nuc_mask], axis=0)
 
 
-def reassign_track_ids(
-    df:     pd.DataFrame,
-    masks:  dict,
-    track:  int,
-    offset: int
-) -> tuple[pd.DataFrame, int]:
+def reassign_frame_ids(df: pd.DataFrame, masks: dict, frame: int) -> tuple[pd.DataFrame, int]:
     '''
-    Reassign pixel IDs for a single track to a contiguous range starting at offset+1.
+    Reassign pixel IDs for a single frame to a contiguous range starting at 1.
     Updates both the masks dict and the DataFrame.
 
+    IDs are scoped to one frame rather than threaded globally across the
+    whole drug condition. Each frame's combined mask is its own
+    self-contained TIFF file, and every downstream consumer always pairs
+    pixel_id with frame, so there is no need for IDs to be unique or
+    meaningful across different frames - raw pixel_id itself is only ever
+    meaningful within a single frame's independent segmentation to begin
+    with. Scoping per frame also keeps the max pixel ID as small as
+    possible (bounded by how many cells appear in the single busiest
+    frame, not accumulated across every track and frame in the drug
+    condition), which keeps mask storage at uint16 instead of spilling
+    into uint32.
+
+    A new ID is further scoped per (track, raw pixel_id) pair within the
+    frame, not pooled across tracks: two different tracks coincidentally
+    reusing the same raw label number in the same frame must not collapse
+    onto one new ID either.
+
     Inputs:
-        df:     full DataFrame
-        masks:  dict of {(track, frame): 2-layer mask array}
-        track:  track number to reassign
-        offset: starting offset (new IDs begin at offset+1)
+        df:    full DataFrame
+        masks: dict of {(track, frame): 2-layer mask array}
+        frame: frame number to reassign
     Outputs:
-        df:         updated DataFrame
-        new_offset: max pixel ID after reassignment
+        df:     updated DataFrame
+        max_id: highest new pixel ID assigned in this frame (0 if none)
     '''
-    track_mask = df['track'] == track
+    frame_mask = df['frame'] == frame
+    next_id    = 1
 
-    # get all valid pixel IDs for this track (excluding 0)
-    old_ids = sorted(df.loc[track_mask & (df['pixel_id'] != 0), 'pixel_id'].unique())
+    for track in sorted(df.loc[frame_mask, 'track'].unique()):
+        track_frame_mask = frame_mask & (df['track'] == track)
 
-    # build contiguous remapping starting at offset+1
-    id_map = {old: new for new, old in enumerate(old_ids, start=offset + 1)}
+        # old ids for just this (track, frame) - never pooled across tracks or frames
+        old_ids = sorted(df.loc[track_frame_mask & (df['pixel_id'] != 0), 'pixel_id'].unique())
+        id_map  = {old: new for new, old in enumerate(old_ids, start=next_id)}
+        next_id += len(old_ids)
 
-    # update DataFrame (unmapped stays 0)
-    df.loc[track_mask, 'pixel_id'] = df.loc[track_mask, 'pixel_id'].map(
-        lambda x: id_map.get(x, 0)
-    )
+        # update DataFrame rows for this (track, frame) (unmapped stays 0)
+        df.loc[track_frame_mask, 'pixel_id'] = df.loc[track_frame_mask, 'pixel_id'].map(
+            lambda x: id_map.get(x, 0)
+        )
 
-    # build lookup table for vectorized mask remapping
-    # lut[old_id] = new_id, index is old pixel ID, value is new pixel ID
-    max_id = max(id_map.keys()) if id_map else 0
-    lut    = np.zeros(max_id + 1, dtype=np.uint32)
-    for old, new in id_map.items():
-        lut[old] = new
+        if not id_map:
+            continue
 
-    # update masks for every frame in this track
-    for frame in df.loc[track_mask, 'frame'].unique():
+        # build lookup table for vectorized mask remapping
+        # lut[old_id] = new_id, index is old pixel ID, value is new pixel ID
+        max_old_id = max(id_map.keys())
+        lut        = np.zeros(max_old_id + 1, dtype=np.uint32)
+        for old, new in id_map.items():
+            lut[old] = new
+
         old_mask = masks[(track, frame)]
         new_mask = np.zeros_like(old_mask)
 
         # remap all valid pixels in one vectorized operation
-        valid               = (old_mask > 0) & (old_mask <= max_id)
-        new_mask[valid]     = lut[old_mask[valid]]
+        valid           = (old_mask > 0) & (old_mask <= max_old_id)
+        new_mask[valid] = lut[old_mask[valid]]
         masks[(track, frame)] = new_mask
 
-    new_offset = max(id_map.values()) if id_map else offset
-    return df, new_offset
+    max_id = next_id - 1
+    return df, max_id
 
 
 def build_masks(df: pd.DataFrame, direc: str, n_jobs: int = 8) -> tuple[pd.DataFrame, dict, np.dtype]:
@@ -260,15 +275,19 @@ def build_masks(df: pd.DataFrame, direc: str, n_jobs: int = 8) -> tuple[pd.DataF
     n_invalid = (~df['has_mask']).sum()
     print(f"  Blob resolution complete: {n_invalid} cells marked has_mask=False")
 
-    # reassign pixel IDs per track sequentially (cannot be parallelized)
+    # reassign pixel IDs per frame - IDs only need to be unique within a
+    # single frame's combined mask (see reassign_frame_ids), so this is no
+    # longer threaded sequentially across frames the way per-track
+    # threading was; each frame's reassignment is independent
     print("  Reassigning pixel IDs...")
-    offset = 0
-    for track in tqdm(sorted(df['track'].unique()), desc='  Reassigning tracks'):
-        df, offset = reassign_track_ids(df, masks, track, offset)
-    print(f"  Pixel IDs reassigned: max pixel_id = {offset}")
-    
+    max_id = 0
+    for frame in tqdm(sorted(df['frame'].unique()), desc='  Reassigning frames'):
+        df, frame_max_id = reassign_frame_ids(df, masks, frame)
+        max_id = max(max_id, frame_max_id)
+    print(f"  Pixel IDs reassigned: max pixel_id per frame = {max_id}")
+
     # choose smallest dtype that fits the max pixel ID
-    dtype = np.uint16 if offset <= 65535 else np.uint32
+    dtype = np.uint16 if max_id <= 65535 else np.uint32
     print(f"  Using dtype: {dtype}")
 
     # convert all masks to the chosen dtype
