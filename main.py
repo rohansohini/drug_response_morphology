@@ -120,6 +120,30 @@ def process_drug(drug: str, raw_dir: str) -> None:
     print(f"  Total time:           {t_total:.1f}s")
     print(f"{'='*50}")
 
+    # --- per-frame retention breakdown ---
+    # lets you see whether loss is concentrated in particular frames (e.g.
+    # later frames getting more crowded) rather than spread evenly, and
+    # which specific failure mode drives it in each frame
+    print(f"\nPer-frame retention: {drug}")
+    header = (
+        f"  {'frame':>5} {'total':>7} {'valid':>7} {'valid%':>7} "
+        f"{'no_nuc':>7} {'no_seg':>7} {'dup':>6} {'m_nuc':>6} {'nuc_out':>8} {'m_cell':>7}"
+    )
+    print(header)
+    print('  ' + '-' * (len(header) - 2))
+    for frame in sorted(df['frame'].unique()):
+        frame_df    = df[df['frame'] == frame]
+        frame_total = len(frame_df)
+        frame_valid = frame_df['has_mask'].sum()
+        frame_pct   = 100 * frame_valid / frame_total if frame_total > 0 else 0.0
+        frame_reasons = frame_df['mask_fail_reason'].value_counts()
+        print(
+            f"  {frame:>5} {frame_total:>7} {frame_valid:>7} {frame_pct:>6.1f}% "
+            f"{frame_reasons.get('no_nuc_match', 0):>7} {frame_reasons.get('no_cell_seg', 0):>7} "
+            f"{frame_reasons.get('pixel_dup', 0):>6} {frame_reasons.get('multi_nuc', 0):>6} "
+            f"{frame_reasons.get('nuc_outside_cell', 0):>8} {frame_reasons.get('multi_cell', 0):>7}"
+        )
+
 
 def main():
     os.makedirs(COMBINED_MASKS_DIR, exist_ok=True)
