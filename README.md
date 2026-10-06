@@ -24,8 +24,11 @@ process_imaging_data/
 │           └── transmission_YY_masks.tiff
 ├── processed_data/
 │   ├── {drug_name}_metadata.csv
-│   └── combined_masks/
-│       └── {drug_name}_frame_YY_mask.tiff
+│   ├── combined_masks/
+│   │   └── {drug_name}_frame_YY_mask.tiff
+│   └── failure_examples/
+│       └── {drug_name}/
+│           └── {drug_name}_{reason}_exampleN_trackXX_frameYY.png
 ├── logs/
 │   └── process_imaging_{job_id}.out
 └── pipeline/
@@ -64,7 +67,7 @@ The pipeline runs end-to-end for each drug condition found under `raw_data/`. St
 
 **5. `join_data.py`** — Join cell and nuclear DataFrames on `(frame, track, x_coord, y_coord)`. Sets `has_mask=False` for unmatched cells, cells with no cell segmentation label, and duplicate pixel IDs. Assigns `mask_fail_reason` for each failure.
 
-**6. `build_masks.py`** — For each `(track, frame)` group, resolves multi-blob segmentation conflicts and builds a 2-layer mask. Reassigns pixel IDs to be globally contiguous across all tracks. Updates `has_mask` and `pixel_id` in the DataFrame accordingly.
+**6. `build_masks.py`** — For each `(track, frame)` group, resolves multi-blob segmentation conflicts and builds a 2-layer mask. Reassigns pixel IDs to be contiguous within each frame, across that frame's tracks (IDs are not meaningful across different frames — each frame's mask is its own independent segmentation). Updates `has_mask` and `pixel_id` in the DataFrame accordingly.
 
 **7. `combine_tracks.py`** — Stitches per-track masks into a single 2-layer TIFF per frame. Handles missing tracks by leaving their regions empty.
 
@@ -95,7 +98,10 @@ One row per cell per frame with the following columns:
 - Layer 0: cell segmentation mask
 - Layer 1: nuclear segmentation mask
 
-Both layers share the same pixel ID labels, which are globally unique and contiguous across all tracks. dtype is `uint16` if max pixel ID ≤ 65535, otherwise `uint32`.
+Both layers share the same pixel ID labels, which are unique and contiguous across all tracks *within this frame* — they reset per frame and are not meaningful across different frames. dtype is `uint16` if max pixel ID ≤ 65535, otherwise `uint32`.
+
+### `failure_examples/{drug_name}/`
+A handful of example crops (up to 5 per reason, 100px half-width around the nucleus centroid) for visual inspection of cells with `mask_fail_reason` in `multi_nuc`, `nuc_outside_cell`, or `pixel_dup` — the failure modes expected under cell overcrowding. Each crop re-loads the raw, unmodified mask from disk, shades distinct segmentation blobs in gray, and highlights the example cell's nucleus pixels in red.
 
 ---
 
