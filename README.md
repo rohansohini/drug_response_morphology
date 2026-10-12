@@ -41,8 +41,8 @@ drug_response_morphology/
 │   ├── masks/, cajal_output/    # masks, CAJAL distances, UMAP embeddings
 │   └── plots/
 │       ├── 01_umap_by_condition_over_time/
-│       │   ├── pdfs/            # one PDF per frame, e.g. cell_frame_01.pdf
-│       │   └── svgs/            # matching SVG per frame
+│       │   ├── pdfs/            # one combined, multi-page PDF, e.g. cell.pdf
+│       │   └── svgs/            # one SVG per frame, e.g. cell_frame_01.svg
 │       ├── 02_proliferators_vem_vs_naive/
 │       │   ├── pdfs/
 │       │   └── svgs/
@@ -94,7 +94,7 @@ python main.py
 
 **Step 2 - the analysis notebooks:**
 
-Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `cell_umap.npz`, and `nuc_umap.npz` all exist), open the notebooks in `analysis/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot. Each notebook writes to its own folder under `output/plots/`, with a `pdfs/` and a matching `svgs/` subfolder (one PDF and one SVG per frame, e.g. `cell_frame_01.pdf` / `cell_frame_01.svg`).
+Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `cell_umap.npz`, and `nuc_umap.npz` all exist), open the notebooks in `analysis/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot. Each notebook writes to its own folder under `output/plots/`, with a `pdfs/` subfolder holding one combined, multi-page PDF per modality (e.g. `cell.pdf`, one page per frame) and a `svgs/` subfolder holding one SVG per frame (e.g. `cell_frame_01.svg`).
 
 ---
 

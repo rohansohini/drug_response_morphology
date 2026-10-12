@@ -47,7 +47,18 @@ def test_legend_shows_well_sampled_groups_only():
     print("PASS: legend shows exactly the well-sampled groups, with real labels (not empty/auto-generated)")
 
 
-def test_export_kde_by_frame_writes_matching_pdf_and_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
+def _pdf_page_count(path):
+    # no pdf-parsing library is in this project's dependencies - count
+    # page objects directly in the raw bytes instead of adding one. Each
+    # page object is "/Type /Page" (no trailing word char); the one
+    # "/Type /Pages" tree-root object has a trailing 's' so \b excludes it.
+    import re
+    with open(path, 'rb') as f:
+        data = f.read()
+    return len(re.findall(rb'/Type\s*/Page\b', data))
+
+
+def test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
     import shutil
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -66,20 +77,53 @@ def test_export_kde_by_frame_writes_matching_pdf_and_svg_per_frame(tmp_dir='/tmp
 
     pdf_dir = os.path.join(tmp_dir, 'pdfs')
     svg_dir = os.path.join(tmp_dir, 'svgs')
-    expected_pdfs = {f'cell_frame_0{f}.pdf' for f in [1, 2, 3]}
     expected_svgs = {f'cell_frame_0{f}.svg' for f in [1, 2, 3]}
 
-    assert set(os.listdir(pdf_dir)) == expected_pdfs, f"got {os.listdir(pdf_dir)}"
+    assert set(os.listdir(pdf_dir)) == {'cell.pdf'}, \
+        f"expected a single combined PDF, got {os.listdir(pdf_dir)}"
     assert set(os.listdir(svg_dir)) == expected_svgs, f"got {os.listdir(svg_dir)}"
-    for f in expected_pdfs | expected_svgs:
-        folder = pdf_dir if f.endswith('.pdf') else svg_dir
-        assert os.path.getsize(os.path.join(folder, f)) > 0, f"{f} is empty"
+
+    pdf_path = os.path.join(pdf_dir, 'cell.pdf')
+    assert os.path.getsize(pdf_path) > 0, "cell.pdf is empty"
+    assert _pdf_page_count(pdf_path) == 3, \
+        f"expected 3 pages (one per frame) in the combined PDF, got {_pdf_page_count(pdf_path)}"
+    for f in expected_svgs:
+        assert os.path.getsize(os.path.join(svg_dir, f)) > 0, f"{f} is empty"
 
     shutil.rmtree(tmp_dir)
-    print("PASS: export_kde_by_frame writes one matching PDF and SVG per frame, in separate subfolders")
+    print("PASS: export_kde_by_frame writes one combined multi-page PDF and one SVG per frame")
+
+
+def test_kde_contours_are_unfilled_outlines_at_default_levels():
+    # regression test: plot_umap_with_kde must draw unfilled contour lines
+    # (fill=False) at exactly the default levels (0.7, 0.8, 0.9), not a
+    # filled density blob at 5 auto-spaced levels.
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, 100),
+        'umap_1': rng.normal(0, 1, 100),
+        'condition': ['naive'] * 100,
+    })
+
+    fig, ax = plt.subplots()
+    plot_umap_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title', min_group_size=5)
+
+    # both fill=True and fill=False produce a QuadContourSet - get_fill()
+    # is the actual signal for filled vs. outline-only, and len(.levels)
+    # confirms exactly 3 contour lines (0.7, 0.8, 0.9) rather than the old
+    # default of 5 auto-spaced levels
+    from matplotlib.contour import QuadContourSet
+    contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
+    assert len(contour_sets) == 1, f"expected exactly one KDE contour set, got {len(contour_sets)}"
+    assert contour_sets[0].get_fill() is False, "expected an unfilled (outline-only) KDE contour"
+    assert len(contour_sets[0].levels) == 3, \
+        f"expected exactly 3 contour levels (0.7, 0.8, 0.9), got {len(contour_sets[0].levels)}"
+
+    print("PASS: KDE contours are drawn as unfilled outlines at exactly 3 levels")
 
 
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
-    test_export_kde_by_frame_writes_matching_pdf_and_svg_per_frame()
+    test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
+    test_kde_contours_are_unfilled_outlines_at_default_levels()
     print("\nAll tests passed.")
