@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pandas as pd
 from scipy.io import loadmat
@@ -17,24 +16,28 @@ from pipeline.utils.image_utils import ind2sub_square
 #  - pixel_idx_list: (N x 2) array of 0-indexed [row, col] pixel indices for each nucleus
 
 
-def load_nuclear_data(direc: str, img_size: int = 2501) -> pd.DataFrame:
+def load_nuclear_data(segmentation_info_files: dict[int, str], img_size: int = 2501) -> pd.DataFrame:
     '''
-    Load nuclear segmentation data from a directory of .mat files.
+    Load nuclear segmentation data from each track's segmentation_info .mat file.
     Returns one row per nucleus per frame across all tracks.
 
     Inputs:
-        direc:    path to nuclear_segmentation_info/ directory
+        segmentation_info_files: {track_number: path to that track's
+                                  segmentation_info_*.mat} (see
+                                  discover_raw_data.discover_tracks) - track
+                                  number comes from this mapping, not the
+                                  filename, since the number embedded in
+                                  segmentation_info_*.mat filenames is not
+                                  reliably correct
         img_size: side length of the square image for pixel index conversion (default 2501)
     Outputs:
         df: nuclear DataFrame with columns [frame, x_coord, y_coord, track, pixel_idx_list]
     '''
-    rows      = []
-    mat_files = np.sort([f for f in os.listdir(direc) if f.endswith('.mat')])
+    rows = []
 
-    for file in mat_files:
-        data     = loadmat(os.path.join(direc, file))
+    for track, file_path in segmentation_info_files.items():
+        data     = loadmat(file_path)
         n_frames = data['clusters'].shape[0]
-        track = int(file.split('segmentation_info_')[1].split('.mat')[0])
 
         for f in range(n_frames):
             cluster  = data['clusters'][f][0]

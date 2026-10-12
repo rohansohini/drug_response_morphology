@@ -11,12 +11,12 @@ def load_mask(track: int, frame: int, direc: str) -> np.ndarray:
     Inputs:
         track: track number
         frame: frame number
-        direc: directory containing the mask image folders
+        direc: drug root directory (contains Output_Segmentation/)
     Outputs:
         mask_img: segmentation mask as a NumPy array
     '''
-    folder    = 'transmission_region_' + str(int(track)).zfill(2) + '/'
-    file_name = 'transmission_' + str(int(frame)).zfill(2) + '_masks.tiff'
+    folder    = os.path.join('Output_Segmentation', 'Transmission_region_' + str(int(track)).zfill(2))
+    file_name = 'Transmission_' + str(int(frame)).zfill(2) + '_masks.tiff'
     full_path = os.path.join(direc, folder, file_name)
 
     with open(full_path, 'rb') as f:

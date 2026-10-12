@@ -14,5 +14,3 @@ dependencies:
   - pillow
   - ipykernel
   - pip
-  - pip:
-    - natsort

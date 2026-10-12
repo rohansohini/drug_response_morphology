@@ -11,17 +11,9 @@ By Rohan Sohini with help from Claude Sonnet 4.6 Medium
 ```
 process_imaging_data/
 ├── main.py
+├── config.py
 ├── slurm_submit.sh
 ├── environment.yml
-├── raw_data/
-│   └── {drug_name}/
-│       ├── track_tables/
-│       │   └── track_table_XX.mat
-│       ├── nuclear_segmentation_info/
-│       │   └── segmentation_info_XX.mat
-│       ├── sorted_idx.mat
-│       └── transmission_region_XX/
-│           └── transmission_YY_masks.tiff
 ├── processed_data/
 │   ├── {drug_name}_metadata.csv
 │   ├── combined_masks/
@@ -32,6 +24,7 @@ process_imaging_data/
 ├── logs/
 │   └── process_imaging_{job_id}.out
 └── pipeline/
+    ├── discover_raw_data.py
     ├── track_table.py
     ├── load_nuclear_data.py
     ├── pixel_ids.py
@@ -43,35 +36,51 @@ process_imaging_data/
         └── image_utils.py
 ```
 
+Raw data is **not** stored inside this repo - each drug condition's data lives wherever it actually sits on disk, and `config.DRUG_DIRS` points at it (see Configuration below). Each drug directory must look like:
+
+```
+{drug_dir}/
+├── sorted_idx.mat
+├── Cropped_XX/
+│   ├── track_table_*.mat
+│   └── segmentation_info_*.mat
+└── Output_Segmentation/
+    └── Transmission_region_XX/
+        └── Transmission_YY_masks.tiff
+```
+
 Where:
-- `{drug_name}` — one folder per condition (e.g. `naive`, `vemurafenib`)
-- `track_table_XX.mat` — cell track data, one per track
-- `segmentation_info_XX.mat` — nuclear segmentation data, one per track
+- `{drug_dir}` — one directory per condition, as given in `config.DRUG_DIRS` (e.g. `A2_naive`, `A1_1uM_vem`)
+- `Cropped_XX/` — one folder per track (`XX` ranges 1-25); **only the folder's own number is trusted as the track number** - the numbers embedded in `track_table_*.mat` and `segmentation_info_*.mat` filenames inside it are not reliably correct, so each is found by globbing the folder for exactly one match rather than by constructing an exact filename (see `pipeline/discover_raw_data.py`)
+- `track_table_*.mat` — cell track data for that folder's track
+- `segmentation_info_*.mat` — nuclear segmentation data for that folder's track
 - `sorted_idx.mat` — lineage classification labels (`cloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
-- `transmission_region_XX/` — cell segmentation masks, one folder per track
-- `transmission_YY_masks.tiff` — segmentation mask, one per frame
+- `Output_Segmentation/Transmission_region_XX/` — cell segmentation masks, one folder per track
+- `Transmission_YY_masks.tiff` — segmentation mask, one per frame
 
 ---
 
 ## Pipeline Overview
 
-The pipeline runs end-to-end for each drug condition found under `raw_data/`. Steps run in the following order:
+The pipeline runs end-to-end for each drug condition in `config.DRUG_DIRS`. Steps run in the following order:
 
-**1. `track_table.py`** — Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks.
+**1. `discover_raw_data.py`** — Discover each track's `track_table_*.mat` and `segmentation_info_*.mat` files from the `Cropped_XX/` folders, keyed by the folder's own track number (never the filename's).
 
-**2. `append_labels.py`** — Append lineage classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per lineage, broadcast to all rows sharing that `lin_id`.
+**2. `track_table.py`** — Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks. Rows beyond `config.MAX_FRAME` are dropped here, before any of the expensive per-frame mask work below runs.
 
-**3. `load_nuclear_data.py`** — Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts.
+**3. `append_labels.py`** — Append lineage classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per lineage, broadcast to all rows sharing that `lin_id`.
 
-**4. `pixel_ids.py`** — Assign each cell a `pixel_id` by looking up its nucleus coordinates in the segmentation mask. Flags duplicate pixel IDs within a `(track, frame)` group.
+**4. `load_nuclear_data.py`** — Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts. Also restricted to `config.MAX_FRAME`.
 
-**5. `join_data.py`** — Join cell and nuclear DataFrames on `(frame, track, x_coord, y_coord)`. Sets `has_mask=False` for unmatched cells, cells with no cell segmentation label, and duplicate pixel IDs. Assigns `mask_fail_reason` for each failure.
+**5. `pixel_ids.py`** — Assign each cell a `pixel_id` by looking up its nucleus coordinates in the segmentation mask. Flags duplicate pixel IDs within a `(track, frame)` group.
 
-**6. `build_masks.py`** — For each `(track, frame)` group, resolves multi-blob segmentation conflicts and builds a 2-layer mask. Reassigns pixel IDs to be contiguous within each frame, across that frame's tracks (IDs are not meaningful across different frames — each frame's mask is its own independent segmentation). Updates `has_mask` and `pixel_id` in the DataFrame accordingly.
+**6. `join_data.py`** — Join cell and nuclear DataFrames on `(frame, track, x_coord, y_coord)`. Sets `has_mask=False` for unmatched cells, cells with no cell segmentation label, and duplicate pixel IDs. Assigns `mask_fail_reason` for each failure.
 
-**7. `combine_tracks.py`** — Stitches per-track masks into a single 2-layer TIFF per frame. Handles missing tracks by leaving their regions empty.
+**7. `build_masks.py`** — For each `(track, frame)` group, resolves multi-blob segmentation conflicts and builds a 2-layer mask. Reassigns pixel IDs to be contiguous within each frame, across that frame's tracks (IDs are not meaningful across different frames — each frame's mask is its own independent segmentation). Updates `has_mask` and `pixel_id` in the DataFrame accordingly.
 
-**8. Export** — Saves `{drug_name}_metadata.csv` with final metadata columns.
+**8. `combine_tracks.py`** — Stitches per-track masks into a single 2-layer TIFF per frame. Handles missing tracks by leaving their regions empty.
+
+**9. Export** — Saves `{drug_name}_metadata.csv` with final metadata columns.
 
 ---
 
@@ -120,16 +129,22 @@ Connected components are computed using 4-connectivity (no diagonal connections)
 
 ## Configuration
 
-Edit the constants at the top of `main.py`:
+Edit `config.py`:
 
 ```python
-RAW_DATA_DIR       = 'raw_data/'       # path to raw data
+DRUG_DIRS = {
+    'A2_naive':   '/path/to/A2_naive/drug_dir',    # wherever this condition's raw data actually lives
+    'A1_1uM_vem': '/path/to/A1_1uM_vem/drug_dir',
+}
+
 PROCESSED_DATA_DIR = 'processed_data/' # path to output directory
-N_JOBS             = 16                # number of parallel jobs (set to match allocated cores)
-BUFFER             = 2                 # pixel buffer for nucleus coordinate lookup
-IMG_SIZE           = 2501              # side length of each track image (pixels)
-MAX_FRAME          = 13                # frames beyond this are excluded entirely (unreliable, heavy overcrowding)
+N_JOBS              = 16                # number of parallel jobs (set to match allocated cores)
+BUFFER              = 2                 # pixel buffer for nucleus coordinate lookup
+IMG_SIZE            = 2501              # side length of each track image (pixels)
+MAX_FRAME           = 13                # frames beyond this are excluded entirely (unreliable, heavy overcrowding)
 ```
+
+Raw data is read directly from each path in `DRUG_DIRS` - nothing is copied into this repo. Each path must follow the layout described in Directory Structure above.
 
 ---
 
@@ -171,4 +186,4 @@ sbatch slurm_submit.sh
 
 Logs are written to `logs/process_imaging_{job_id}.out`.
 
-Drug conditions are inferred automatically from folder names under `raw_data/`. Each condition is processed independently and sequentially.
+Drug conditions come from `config.DRUG_DIRS`. Each condition is processed independently and sequentially.

@@ -20,12 +20,17 @@ from scipy.io import loadmat
 #  - track:        track number (1-indexed)
 
 
-def load_track(file_path: str) -> pd.DataFrame:
+def load_track(file_path: str, track: int) -> pd.DataFrame:
     '''
     Load a single .mat track table and return a tidy DataFrame.
 
     Inputs:
         file_path: path to the .mat file
+        track:     this file's track number - passed in explicitly (from
+                   its Cropped_XX folder name, see discover_raw_data.py)
+                   rather than parsed from the filename, since the number
+                   embedded in track_table_*.mat filenames is not
+                   reliably correct
     Outputs:
         df: cleaned DataFrame with columns [frame, node_id, pred_node_id, lin_id, x_coord, y_coord, track]
     '''
@@ -57,8 +62,7 @@ def load_track(file_path: str) -> pd.DataFrame:
     df['x_coord'] = df['x_coord'] - 1
     df['y_coord'] = df['y_coord'] - 1
 
-    # parse track number from filename (e.g. "track_table_03.mat" -> 3)
-    df['track'] = int(file_path.split('track_table_')[1].split('.mat')[0])
+    df['track'] = track
 
     return df
 
@@ -117,18 +121,19 @@ def make_master_ids(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def load_track_table(file_paths: list[str]) -> pd.DataFrame:
+def load_track_table(track_files: dict[int, str]) -> pd.DataFrame:
     '''
     Load, concatenate, and assign master IDs across all track tables.
 
     Inputs:
-        file_paths: list of paths to .mat track table files
+        track_files: {track_number: path to that track's track_table_*.mat}
+                     (see discover_raw_data.discover_tracks)
     Outputs:
         df: master DataFrame with columns [frame, node_id, pred_node_id, lin_id, x_coord, y_coord, track]
     '''
     # load and concatenate all tracks
     df = pd.concat(
-        [load_track(fp) for fp in file_paths],
+        [load_track(fp, track) for track, fp in track_files.items()],
         ignore_index=True
     )
 
