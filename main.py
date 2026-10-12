@@ -21,9 +21,10 @@ RAW_DATA_DIR       = 'raw_data/'
 PROCESSED_DATA_DIR = 'processed_data/'
 COMBINED_MASKS_DIR = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
-N_JOBS   = 16
-BUFFER   = 5
-IMG_SIZE = 2501
+N_JOBS    = 16
+BUFFER    = 2
+IMG_SIZE  = 2501
+MAX_FRAME = 13   # frames beyond this are unreliable (heavy overcrowding) and excluded entirely
 
 ##############################################################
 
@@ -57,6 +58,13 @@ def process_drug(drug: str, raw_dir: str) -> None:
     df = load_track_table(track_files)
     print(f"  Loaded {len(df)} rows across {df['track'].nunique()} tracks ({time.time()-t:.1f}s)")
 
+    # restrict to reliable frames only - dropped here, before any of the
+    # expensive per-frame mask work below, so frames beyond MAX_FRAME cost
+    # nothing rather than just getting filtered out of the final export
+    n_before = len(df)
+    df = df[df['frame'] <= MAX_FRAME].reset_index(drop=True)
+    print(f"  Restricted to frames <= {MAX_FRAME}: {len(df)}/{n_before} rows kept")
+
     # --- step 2: append lineage classification labels ---
     print("\n[2/7] Appending classification labels...")
     t = time.time()
@@ -68,6 +76,10 @@ def process_drug(drug: str, raw_dir: str) -> None:
     t = time.time()
     nuc_df = load_nuclear_data(nuclear_data_dir, img_size=IMG_SIZE)
     print(f"  Loaded {len(nuc_df)} nuclei ({time.time()-t:.1f}s)")
+
+    n_before = len(nuc_df)
+    nuc_df = nuc_df[nuc_df['frame'] <= MAX_FRAME].reset_index(drop=True)
+    print(f"  Restricted to frames <= {MAX_FRAME}: {len(nuc_df)}/{n_before} nuclei kept")
 
     # --- step 4: assign pixel IDs ---
     print("\n[4/7] Assigning pixel IDs...")

@@ -126,8 +126,9 @@ Edit the constants at the top of `main.py`:
 RAW_DATA_DIR       = 'raw_data/'       # path to raw data
 PROCESSED_DATA_DIR = 'processed_data/' # path to output directory
 N_JOBS             = 16                # number of parallel jobs (set to match allocated cores)
-BUFFER             = 5                 # pixel buffer for nucleus coordinate lookup
+BUFFER             = 2                 # pixel buffer for nucleus coordinate lookup
 IMG_SIZE           = 2501              # side length of each track image (pixels)
+MAX_FRAME          = 13                # frames beyond this are excluded entirely (unreliable, heavy overcrowding)
 ```
 
 ---
