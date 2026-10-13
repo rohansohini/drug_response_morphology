@@ -6,7 +6,7 @@ from matplotlib.lines import Line2D
 import seaborn as sns
 
 
-def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5, levels=(0.7, 0.8, 0.9)):
+def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5, levels=(0.7, 0.8, 0.9), xlim=None, ylim=None):
     '''
     Scatter every cell in df (light grey background), then overlay a KDE
     contour per group in group_col.
@@ -25,6 +25,10 @@ def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5,
                         misleading shape)
         levels:         iso-proportion levels to draw as unfilled contour
                         lines (outline only, no fill)
+        xlim, ylim:     (min, max) tuples to fix the axes to, or None to
+                        auto-scale to this call's own data (see
+                        export_kde_by_frame, which fixes these across
+                        every frame's page so they're directly comparable)
     '''
     ax.scatter(df['umap_0'], df['umap_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
 
@@ -47,6 +51,10 @@ def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5,
     ax.set_title(title)
     ax.set_xlabel('UMAP 1')
     ax.set_ylabel('UMAP 2')
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     ax.legend(handles=legend_handles, fontsize=8)
 
 
@@ -59,6 +67,16 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, ti
     format, so it stays one file per frame while the PDF is combined into
     a single file. Shared by every analysis notebook - they differ only in
     which df/group_col/colors/output_dir they pass in.
+
+    Every page shares the same, fixed axis limits - computed once from
+    every frame's cells in df together, padded 5% on each side - rather
+    than each page auto-scaling to just its own frame's data range. Without
+    this, two pages can independently end up with very similar axis
+    ranges whenever their data happens to span a similar extent, making
+    two actually-different points land in very similar relative screen
+    positions purely from the auto-scaling, not because the underlying
+    data matches - fixed axes remove that ambiguity and make frames
+    directly visually comparable besides.
 
     Inputs:
         df:             must have: frame, umap_0, umap_1, group_col
@@ -79,6 +97,13 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, ti
 
     pdf_path = os.path.join(pdf_dir, f'{file_prefix}.pdf')
 
+    x_min, x_max = df['umap_0'].min(), df['umap_0'].max()
+    y_min, y_max = df['umap_1'].min(), df['umap_1'].max()
+    x_pad = (x_max - x_min) * 0.05
+    y_pad = (y_max - y_min) * 0.05
+    xlim  = (x_min - x_pad, x_max + x_pad)
+    ylim  = (y_min - y_pad, y_max + y_pad)
+
     with PdfPages(pdf_path) as pdf:
         for frame in frames:
             subset = df[df['frame'] == frame]
@@ -86,6 +111,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, ti
             plot_umap_with_kde(
                 subset, group_col, group_colors, ax,
                 f'{title_prefix} - frame {frame}', min_group_size=min_group_size,
+                xlim=xlim, ylim=ylim,
             )
             pdf.savefig(fig, bbox_inches='tight')
             fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')

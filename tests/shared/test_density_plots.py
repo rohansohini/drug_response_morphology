@@ -122,8 +122,72 @@ def test_kde_contours_are_unfilled_outlines_at_default_levels():
     print("PASS: KDE contours are drawn as unfilled outlines at exactly 3 levels")
 
 
+def test_plot_umap_with_kde_applies_explicit_xlim_ylim():
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, 50),
+        'umap_1': rng.normal(0, 1, 50),
+        'condition': ['naive'] * 50,
+    })
+
+    fig, ax = plt.subplots()
+    plot_umap_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title',
+                        min_group_size=5, xlim=(-10, 10), ylim=(-20, 20))
+
+    assert ax.get_xlim() == (-10, 10), f"expected xlim (-10, 10), got {ax.get_xlim()}"
+    assert ax.get_ylim() == (-20, 20), f"expected ylim (-20, 20), got {ax.get_ylim()}"
+    print("PASS: plot_umap_with_kde applies explicit xlim/ylim when given")
+
+
+def test_export_kde_by_frame_uses_identical_axes_across_frames():
+    # regression test: each page must share the SAME axis limits, computed
+    # once from every frame's data together - not auto-scale independently
+    # per frame. Builds 3 frames with DELIBERATELY very different data
+    # ranges/extents (frame 3's cloud is 10x wider than frame 1's) so
+    # per-frame auto-scaling would clearly produce different axes if the
+    # fix weren't applied.
+    rng = np.random.default_rng(0)
+    rows = []
+    for frame, scale in [(1, 1), (2, 3), (3, 10)]:
+        for _ in range(30):
+            rows.append({'frame': frame, 'condition': 'naive',
+                         'umap_0': rng.normal(0, scale), 'umap_1': rng.normal(0, scale)})
+    df = pd.DataFrame(rows)
+
+    import shutil
+    tmp_dir = '/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_axes_test'
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+
+    import shared.density_plots as dp
+    seen_limits = {}
+    orig = dp.plot_umap_with_kde
+
+    def spy(df_arg, group_col, group_colors, ax, title, **kwargs):
+        seen_limits[title] = (kwargs.get('xlim'), kwargs.get('ylim'))
+        return orig(df_arg, group_col, group_colors, ax, title, **kwargs)
+
+    dp.plot_umap_with_kde = spy
+    try:
+        dp.export_kde_by_frame(df, 'condition', {'naive': 'tab:blue'}, tmp_dir, 'cell')
+    finally:
+        dp.plot_umap_with_kde = orig
+
+    assert len(seen_limits) == 3, f"expected 3 frame calls, got {len(seen_limits)}"
+    distinct_xlims = set(v[0] for v in seen_limits.values())
+    distinct_ylims = set(v[1] for v in seen_limits.values())
+    assert len(distinct_xlims) == 1, f"expected identical xlim across all frames, got {distinct_xlims}"
+    assert len(distinct_ylims) == 1, f"expected identical ylim across all frames, got {distinct_ylims}"
+    assert list(distinct_xlims)[0] is not None, "xlim must not be None - axes must actually be fixed"
+
+    shutil.rmtree(tmp_dir)
+    print("PASS: export_kde_by_frame applies identical axis limits across every frame's page")
+
+
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
+    test_plot_umap_with_kde_applies_explicit_xlim_ylim()
+    test_export_kde_by_frame_uses_identical_axes_across_frames()
     print("\nAll tests passed.")
