@@ -6,8 +6,13 @@ from joblib import Parallel, delayed
 
 # repo root (where shared/ lives) is two levels up from this analysis's
 # own directory - add it to sys.path so `shared.*` imports resolve when
-# this is run directly as `python main.py` from within this directory
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+# this is run directly as `python main.py`, regardless of invocation cwd
+# (Python always puts the executed script's own directory on sys.path,
+# so imports already resolve correctly either way - but config.OUTPUT_DIR
+# et al are cwd-relative, not script-relative, so they do NOT without the
+# re-anchoring below)
+ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT    = os.path.abspath(os.path.join(ANALYSIS_DIR, '..', '..'))
 sys.path.insert(0, REPO_ROOT)
 
 import config
@@ -15,6 +20,18 @@ from select_cells import select_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal
 from shared.cajal.embed import get_umap_embedding
+
+# config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
+# which Python resolves against the current working directory at runtime,
+# not this script's own location - if main.py is ever invoked as
+# `python analyses/naive_vs_vem/main.py` from somewhere else (e.g. the
+# repo root) rather than `cd`-ing into this directory first, those paths
+# would silently resolve under the WRONG directory, including possibly
+# colliding with another analysis's output. Re-anchor them to this
+# script's own directory, same as every notebook already does.
+config.OUTPUT_DIR       = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
+config.MASKS_DIR        = os.path.join(ANALYSIS_DIR, config.MASKS_DIR)
+config.CAJAL_OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.CAJAL_OUTPUT_DIR)
 
 
 def main():
