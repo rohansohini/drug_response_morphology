@@ -184,10 +184,42 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
     print("PASS: export_kde_by_frame applies identical axis limits across every frame's page")
 
 
+def test_scatter_points_colored_by_own_group_with_fallback():
+    import matplotlib.colors as mcolors
+    from matplotlib.collections import PathCollection
+
+    rng = np.random.default_rng(0)
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, 30),
+        'umap_1': rng.normal(0, 1, 30),
+        'subclass': ['dying'] * 10 + ['persisting'] * 10 + ['unmapped_type'] * 10,
+    })
+    group_colors = {'dying': 'tab:red', 'persisting': 'tab:purple'}
+
+    fig, ax = plt.subplots()
+    plot_umap_with_kde(df, 'subclass', group_colors, ax, 'test title', min_group_size=5)
+
+    scatter = [c for c in ax.collections if isinstance(c, PathCollection)][0]
+    face_colors = scatter.get_facecolors()
+
+    red    = mcolors.to_rgba('tab:red', alpha=0.3)
+    purple = mcolors.to_rgba('tab:purple', alpha=0.3)
+    grey   = mcolors.to_rgba('lightgrey', alpha=0.3)
+    close  = lambda a, b: all(abs(x - y) < 1e-6 for x, y in zip(a, b))
+
+    assert all(close(face_colors[i], red) for i in range(10)), "dying points should be red"
+    assert all(close(face_colors[i], purple) for i in range(10, 20)), "persisting points should be purple"
+    assert all(close(face_colors[i], grey) for i in range(20, 30)), \
+        "a group not in group_colors should fall back to grey, not crash or vanish"
+
+    print("PASS: each scatter point is colored by its own group, with a grey fallback for unmapped groups")
+
+
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_umap_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()
+    test_scatter_points_colored_by_own_group_with_fallback()
     print("\nAll tests passed.")

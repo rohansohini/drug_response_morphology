@@ -8,15 +8,18 @@ import seaborn as sns
 
 def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5, levels=(0.7, 0.8, 0.9), xlim=None, ylim=None):
     '''
-    Scatter every cell in df (light grey background), then overlay a KDE
-    contour per group in group_col.
+    Scatter every cell in df, each point colored by its own group in
+    group_col (same color each group's KDE contour uses), then overlay a
+    KDE contour per group.
 
     Inputs:
         df:             must have: umap_0, umap_1, and group_col
         group_col:      column identifying the group to contour per (e.g.
                         'condition' or 'subclass')
         group_colors:   {group_value: color} - also determines which
-                        groups get plotted and their legend order
+                        groups get plotted and their legend order. A
+                        row whose group_col value isn't a key here is
+                        still scattered, in a neutral grey fallback.
         ax:             matplotlib axis to plot on
         title:          plot title
         min_group_size: skip a group's KDE contour if it has fewer points
@@ -30,7 +33,8 @@ def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5,
                         export_kde_by_frame, which fixes these across
                         every frame's page so they're directly comparable)
     '''
-    ax.scatter(df['umap_0'], df['umap_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
+    point_colors = df[group_col].map(group_colors).fillna('lightgrey')
+    ax.scatter(df['umap_0'], df['umap_1'], s=3, color=point_colors, alpha=0.3, zorder=1)
 
     # seaborn's kdeplot doesn't attach a legend-visible label to its contour
     # collections, filled or not (confirmed: they get an auto '_child0' label
