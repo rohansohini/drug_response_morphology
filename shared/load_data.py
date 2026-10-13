@@ -19,27 +19,33 @@ def parse_label(label: str) -> tuple[str, int, int]:
     return condition, int(frame), int(pixel_id)
 
 
-def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFrame) -> pd.DataFrame:
+def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.DataFrame:
     '''
-    Merge UMAP coordinates with the selected-cell metadata.
+    Parse CAJAL point labels and look up each one's full metadata row -
+    the label<->metadata merge, without requiring embedding coordinates
+    (unlike build_dataset, which additionally attaches a UMAP embedding
+    for notebook plotting). Used wherever the 2D UMAP projection itself
+    isn't needed - e.g. statistical tests that operate directly on
+    CAJAL's distance matrix instead (UMAP distorts distances, so it's
+    the wrong representation for anything quantitative).
 
     Inputs:
-        labels:    from shared.cajal.embed.get_umap_embedding
-        embedding: (n, 2) UMAP coordinates, same row order as labels
-        selected:  an analysis's own selected-cell DataFrame (e.g. from
-                   naive_vs_vem's select_cells.select_cells, or
-                   vem_48hr_pretreatment's load_all_cells.load_all_cells)
-                   (must have: condition, frame, pixel_id, subclass,
-                   m_label, k_label)
+        labels:   from shared.cajal.embed.get_umap_embedding or
+                  load_distance_matrix
+        selected: an analysis's own selected-cell DataFrame (e.g. from
+                  naive_vs_vem's select_cells.select_cells, or
+                  vem_48hr_pretreatment's load_all_cells.load_all_cells)
+                  (must have: condition, frame, pixel_id, subclass,
+                  m_label, k_label)
     Outputs:
-        df: one row per embedded cell, columns
-            [label, condition, frame, pixel_id, umap_0, umap_1, subclass, m_label, k_label]
+        df: one row per label, in the SAME row order as `labels` (so row
+            i still corresponds to a distance matrix's row/col i), with
+            columns [label, condition, frame, pixel_id, subclass,
+            m_label, k_label]
     '''
     parsed = [parse_label(l) for l in labels]
     df = pd.DataFrame(parsed, columns=['condition', 'frame', 'pixel_id'])
     df.insert(0, 'label', labels)
-    df['umap_0'] = embedding[:, 0]
-    df['umap_1'] = embedding[:, 1]
 
     meta = selected[['condition', 'frame', 'pixel_id', 'subclass', 'm_label', 'k_label']]
 
@@ -65,6 +71,25 @@ def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFra
             f"cell CAJAL was run on."
         )
 
+    return df
+
+
+def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFrame) -> pd.DataFrame:
+    '''
+    Merge UMAP coordinates with the selected-cell metadata. Thin wrapper
+    around match_labels_to_metadata() that additionally attaches the
+    embedding coordinates, for callers (notebook plotting) that need them.
+
+    Inputs:
+        labels:    from shared.cajal.embed.get_umap_embedding
+        embedding: (n, 2) UMAP coordinates, same row order as labels
+        selected:  see match_labels_to_metadata
+    Outputs:
+        df: from match_labels_to_metadata, plus umap_0/umap_1 columns
+    '''
+    df = match_labels_to_metadata(labels, selected)
+    df['umap_0'] = embedding[:, 0]
+    df['umap_1'] = embedding[:, 1]
     return df
 
 

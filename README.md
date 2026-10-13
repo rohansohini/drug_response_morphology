@@ -27,7 +27,8 @@ For the `vem_1uM_48hrsbefore` dataset: frames 1-2 are *before* drug addition (pr
 1. **Uses every available cell/nucleus** across frames 1-3 - no sampling budget, unlike `naive_vs_vem` (`load_all_cells.py`).
 2. **Runs CAJAL** once per modality on all 3 frames together, so distances are comparable across them.
 3. **Fits one shared UMAP** directly on that distance matrix.
-4. **One notebook** (`01_subclass_by_frame.ipynb`) plots each frame on that shared embedding, colored by subclass via KDE contours - one combined PDF per modality (3 pages, one per frame), so 2 files / 6 plots total.
+4. **`01_subclass_by_frame.ipynb`** plots each frame on that shared embedding, colored by subclass via KDE contours - one combined PDF per modality (3 pages, one per frame), so 2 files / 6 plots total.
+5. **`02_subclass_separation_stats.ipynb`** tests, per frame per modality, whether the 4 subclasses are statistically distinguishable - PERMANOVA + PERMDISP directly on CAJAL's GW distance matrix (never the UMAP projection, which distorts distances), plus pairwise subclass comparisons with Benjamini-Hochberg correction. See "Statistical testing" below.
 
 ---
 
@@ -39,10 +40,11 @@ drug_response_morphology/
 │   ├── cajal/
 │   │   ├── extract_masks.py           # crops selected cells' masks
 │   │   ├── run_cajal.py               # CAJAL icdm + quantized GW distances
-│   │   └── embed.py                   # UMAP on precomputed distances
+│   │   └── embed.py                   # loads the distance matrix; UMAP on it
 │   ├── classify.py                    # m_label/k_label -> subclass (fixed scheme)
-│   ├── load_data.py                   # merges UMAP coordinates with metadata
-│   └── density_plots.py               # shared KDE-over-UMAP plotting, PDF export
+│   ├── load_data.py                   # merges UMAP coordinates / distance-matrix labels with metadata
+│   ├── density_plots.py               # shared KDE-over-UMAP plotting, PDF export
+│   └── permanova.py                   # PERMANOVA/PERMDISP on the distance matrix, BH correction
 ├── analyses/
 │   ├── naive_vs_vem/
 │   │   ├── main.py                    # runs the pipeline end to end
@@ -149,6 +151,25 @@ Fixed and universal across every analysis (`shared/classify.py`), from `process_
 | `persisting` | `m_label == 2` |
 | `slow_prolif` | `m_label == 3` and `k_label` in {1, 2} |
 | `fast_prolif` | `m_label == 3` and `k_label` in {3, 4, 5, 6} |
+
+---
+
+## Statistical testing
+
+`shared/permanova.py` (used by `vem_48hr_pretreatment/notebooks/02_subclass_separation_stats.ipynb`) tests whether a categorical grouping (e.g. subclass) is statistically distinguishable in morphology - operating directly on CAJAL's Gromov-Wasserstein distance matrix, **never** on a UMAP projection of it. UMAP optimizes a 2D layout for visual cluster separation, not for preserving actual distances, so it is the wrong representation for any quantitative claim, including a statistical test.
+
+Two complementary, permutation-based tests are run together, because a significant result from one alone is ambiguous:
+
+| Test | Question | Sensitive to |
+|---|---|---|
+| `permanova()` (Anderson 2001) | Do groups occupy different *locations* in distance space? | Location, but also dispersion |
+| `permdisp()` (Anderson 2006) | Do groups differ in *dispersion* (spread)? | Dispersion only |
+
+A PERMANOVA hit with no PERMDISP hit is a clean location effect. A hit on both is ambiguous - part or all of the PERMANOVA signal may be a dispersion difference rather than a location difference, so the notebook reports both outcomes side by side rather than reading PERMANOVA alone as evidence of separation.
+
+`permanova_pairwise()` runs PERMANOVA on every pair of groups and applies `benjamini_hochberg()` FDR correction across the pairs (e.g. the 6 pairwise subclass comparisons within one frame) - use the resulting `q_value`, not the raw `p_value`, to judge pairwise significance.
+
+All three report an effect size (`R2` for PERMANOVA, `mean_dispersion` per group for PERMDISP) alongside the permutation p-value, since p-values alone are close to meaningless at the cell counts these analyses work with (thousands of cells per frame).
 
 ---
 

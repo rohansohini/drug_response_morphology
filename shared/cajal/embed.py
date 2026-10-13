@@ -24,6 +24,33 @@ def reformat_name(name: str) -> str:
     return f'{condition_frame}_pixel_{pixel_id}'
 
 
+def load_distance_matrix(dist_csv: str) -> tuple[list[str], np.ndarray]:
+    '''
+    Load a CAJAL quantized-GW distance matrix and its point labels from disk.
+    Used both by get_umap_embedding (which fits UMAP for plotting) and by
+    anything that needs the distance matrix itself for quantitative work
+    (e.g. PERMANOVA/PERMDISP, which must NOT operate on the UMAP projection -
+    UMAP distorts distances, so it's the wrong representation for anything
+    quantitative).
+
+    Inputs:
+        dist_csv: path to a *_qgw_*_dists.csv file (cell or nuc), covering
+                  every selected cell from every condition together (so
+                  distances are directly comparable across conditions)
+    Outputs:
+        labels:      list of node identifiers '{condition}_frame_{frame}_pixel_{pixel_id}'
+        dist_matrix: (n_nodes, n_nodes) symmetric GW distance matrix, same
+                     row/col order as labels
+    '''
+    print("  Loading distance matrix...")
+    t0 = time.time()
+    names, dist_dict = cajal.utilities.read_gw_dists(dist_csv, header=True)
+    dist_matrix = cajal.utilities.dist_mat_of_dict(dist_dict, names)
+    labels = [reformat_name(n) for n in names]
+    print(f"  Loaded {len(labels)} points ({time.time() - t0:.1f}s)")
+    return labels, dist_matrix
+
+
 def get_umap_embedding(dist_csv: str, out_path: str, seed: int = 42) -> tuple[list[str], np.ndarray]:
     '''
     Fit a 2D UMAP directly on a CAJAL quantized-GW distance matrix.
@@ -44,12 +71,7 @@ def get_umap_embedding(dist_csv: str, out_path: str, seed: int = 42) -> tuple[li
         data = np.load(out_path, allow_pickle=True)
         return list(data['labels']), data['embedding']
 
-    print("  Loading distance matrix...")
-    t0 = time.time()
-    names, dist_dict = cajal.utilities.read_gw_dists(dist_csv, header=True)
-    dist_matrix = cajal.utilities.dist_mat_of_dict(dist_dict, names)
-    labels = [reformat_name(n) for n in names]
-    print(f"  Loaded {len(labels)} points ({time.time() - t0:.1f}s)")
+    labels, dist_matrix = load_distance_matrix(dist_csv)
 
     print("  Fitting UMAP (precomputed distance)...")
     t0 = time.time()
