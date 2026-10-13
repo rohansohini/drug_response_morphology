@@ -187,3 +187,5 @@ sbatch slurm_submit.sh
 Logs are written to `logs/process_imaging_{job_id}.out`.
 
 Drug conditions come from `config.DRUG_DIRS`. Each condition is processed independently and sequentially.
+
+A drug is skipped if its `processed_data/{drug_name}_metadata.csv` already exists, rather than being reprocessed from scratch. Delete that file (there's no need to delete `combined_masks/` or `failure_examples/`, those get overwritten on a fresh run) to force that drug to be reprocessed - e.g. after changing `config.py` or the raw data itself.

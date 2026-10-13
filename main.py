@@ -148,6 +148,15 @@ def main():
     print(f"Found conditions: {list(config.DRUG_DIRS.keys())}")
 
     for drug, drug_dir in config.DRUG_DIRS.items():
+        # {drug}_metadata.csv is the last file process_drug() writes, so its
+        # presence means that drug's run already finished - skip it rather
+        # than redoing the full (slow) pipeline. Delete the CSV to force a
+        # drug to be reprocessed (e.g. after changing config.py or raw data).
+        out_path = os.path.join(config.PROCESSED_DATA_DIR, f"{drug}_metadata.csv")
+        if os.path.exists(out_path):
+            print(f"\nSkipping {drug}: {out_path} already exists")
+            continue
+
         process_drug(drug, drug_dir)
 
 
