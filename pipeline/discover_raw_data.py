@@ -38,22 +38,28 @@ def discover_tracks(drug_dir: str) -> tuple[dict[int, str], dict[int, str]]:
     folder (expecting exactly one match) rather than by constructing an
     exact filename from the track number.
 
+    Folders matching Cropped_* but not Cropped_<digits> (e.g. a
+    Cropped_matlab_only scratch folder sitting alongside the real ones)
+    are not track data and are skipped rather than treated as an error.
+
     Inputs:
         drug_dir: path to one drug's raw data root (contains Cropped_XX/ folders)
     Outputs:
         track_table_files:       {track_number: path to track_table_*.mat}
         segmentation_info_files: {track_number: path to segmentation_info_*.mat}
     '''
-    cropped_dirs = sorted(glob.glob(os.path.join(drug_dir, 'Cropped_*')))
-    assert cropped_dirs, f"no Cropped_XX folders found under {drug_dir}"
+    all_cropped_dirs = sorted(glob.glob(os.path.join(drug_dir, 'Cropped_*')))
+    cropped_dirs = [
+        d for d in all_cropped_dirs
+        if re.match(r'Cropped_\d+$', os.path.basename(d))
+    ]
+    assert cropped_dirs, f"no Cropped_XX (numbered) folders found under {drug_dir}"
 
     track_table_files       = {}
     segmentation_info_files = {}
 
     for cropped_dir in cropped_dirs:
-        match = re.match(r'Cropped_(\d+)$', os.path.basename(cropped_dir))
-        assert match, f"folder name doesn't match 'Cropped_XX': {cropped_dir}"
-        track = int(match.group(1))
+        track = int(re.match(r'Cropped_(\d+)$', os.path.basename(cropped_dir)).group(1))
 
         track_table_files[track]       = _glob_one(cropped_dir, 'track_table_*.mat')
         segmentation_info_files[track] = _glob_one(cropped_dir, 'segmentation_info_*.mat')

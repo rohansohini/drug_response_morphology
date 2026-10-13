@@ -40,6 +40,26 @@ def test_discovers_tracks_by_folder_number_not_filename_number():
         shutil.rmtree(tmp_dir)
 
 
+def test_skips_non_numbered_cropped_folders():
+    # a scratch/non-track folder like Cropped_matlab_only can sit alongside
+    # the real numbered ones (confirmed on real Quest data) - it must be
+    # silently skipped, not treated as an error
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        _touch(os.path.join(tmp_dir, 'Cropped_1', 'track_table_01.mat'))
+        _touch(os.path.join(tmp_dir, 'Cropped_1', 'segmentation_info_01.mat'))
+        _touch(os.path.join(tmp_dir, 'Cropped_matlab_only', 'some_other_file.mat'))
+
+        track_table_files, segmentation_info_files = discover_tracks(tmp_dir)
+
+        assert set(track_table_files.keys()) == {1}
+        assert set(segmentation_info_files.keys()) == {1}
+
+        print("PASS: non-numbered Cropped_* folders (e.g. Cropped_matlab_only) are skipped, not an error")
+    finally:
+        shutil.rmtree(tmp_dir)
+
+
 def test_raises_on_missing_file_in_a_cropped_folder():
     tmp_dir = tempfile.mkdtemp()
     try:
@@ -89,9 +109,30 @@ def test_raises_on_no_cropped_folders():
         shutil.rmtree(tmp_dir)
 
 
+def test_raises_when_only_non_numbered_cropped_folders_exist():
+    # a Cropped_matlab_only folder alone (no real numbered tracks) must
+    # still raise - it's not itself "no data found", it's "no USABLE data
+    # found", and should fail just as loudly
+    tmp_dir = tempfile.mkdtemp()
+    try:
+        _touch(os.path.join(tmp_dir, 'Cropped_matlab_only', 'some_other_file.mat'))
+
+        try:
+            discover_tracks(tmp_dir)
+        except AssertionError as e:
+            assert 'Cropped' in str(e)
+            print("PASS: only-non-numbered-folders case still raises clearly")
+            return
+        raise AssertionError("expected discover_tracks to raise when no numbered Cropped_XX folders exist")
+    finally:
+        shutil.rmtree(tmp_dir)
+
+
 if __name__ == '__main__':
     test_discovers_tracks_by_folder_number_not_filename_number()
+    test_skips_non_numbered_cropped_folders()
     test_raises_on_missing_file_in_a_cropped_folder()
     test_raises_on_duplicate_file_in_a_cropped_folder()
     test_raises_on_no_cropped_folders()
+    test_raises_when_only_non_numbered_cropped_folders_exist()
     print("\nAll tests passed.")
