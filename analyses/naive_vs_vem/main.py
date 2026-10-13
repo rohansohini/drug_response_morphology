@@ -1,12 +1,20 @@
 import os
+import sys
+
 import pandas as pd
 from joblib import Parallel, delayed
 
+# repo root (where shared/ lives) is two levels up from this analysis's
+# own directory - add it to sys.path so `shared.*` imports resolve when
+# this is run directly as `python main.py` from within this directory
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, REPO_ROOT)
+
 import config
-from pipeline.select_cells import select_cells
-from cajal_pipeline.extract_masks import extract_masks
-from cajal_pipeline.run_cajal import run_cajal
-from cajal_pipeline.embed import get_umap_embedding
+from select_cells import select_cells
+from shared.cajal.extract_masks import extract_masks
+from shared.cajal.run_cajal import run_cajal
+from shared.cajal.embed import get_umap_embedding
 
 
 def main():

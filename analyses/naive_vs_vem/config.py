@@ -9,20 +9,12 @@ NAIVE_CONDITION = 'A2_naive'
 VEM_CONDITION   = 'A1_1uM_vem'
 CONDITIONS      = [NAIVE_CONDITION, VEM_CONDITION]
 
-###### Subcluster classification
-#  m_label: 1 = dying, 2 = persister, 3 = proliferator (see
-#  process_imaging_data/README.md). Within m_label == 3, k_label splits
-#  slow (1, 2) vs fast (3, 4, 5, 6) proliferators.
-DYING_M_LABEL      = 1
-PERSISTING_M_LABEL = 2
-PROLIF_M_LABEL     = 3
-SLOW_K_LABELS      = [1, 2]
-FAST_K_LABELS      = [3, 4, 5, 6]
-
 ###### Sampling
 #  Total cells selected for CAJAL, split across conditions by weight, then
 #  water-filled within each condition across its own (frame, subclass)
-#  buckets - see pipeline/allocation.py and pipeline/select_cells.py.
+#  buckets - see allocation.py and select_cells.py. The classification
+#  scheme itself (m_label/k_label -> subclass) is universal across every
+#  analysis in this repo, not specific to this one - see shared/classify.py.
 TOTAL_CELL_BUDGET = 30_000
 CONDITION_WEIGHTS = {NAIVE_CONDITION: 0.2, VEM_CONDITION: 0.8}   # must sum to 1.0
 
@@ -44,7 +36,7 @@ def metadata_csv_path(condition: str) -> str:
 
 ###### Mask extraction / CAJAL parameters
 PAD_SIZE   = 200   # pixels of zero-padding added to each side of extracted masks
-N_JOBS     = 52    # parallel jobs for mask extraction / CAJAL - must match slurm_submit.sh's --ntasks
+N_JOBS     = 52    # parallel jobs for mask extraction / CAJAL - must match slurm_submit.sh's --cpus-per-task
 N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 20    # clusters for quantized GW
 

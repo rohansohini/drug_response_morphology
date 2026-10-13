@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/test_select_cells.py
+Run directly: python3 tests/analyses/naive_vs_vem/test_select_cells.py
 '''
 import os
 import sys
@@ -7,9 +7,12 @@ import sys
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+REPO_ROOT    = os.path.join(os.path.dirname(__file__), '..', '..', '..')
+ANALYSIS_DIR = os.path.join(REPO_ROOT, 'analyses', 'naive_vs_vem')
+sys.path.insert(0, REPO_ROOT)      # for select_cells.py's `from shared.classify import ...`
+sys.path.insert(0, ANALYSIS_DIR)   # for `import config` / `from select_cells import ...`
 import config
-from pipeline.select_cells import select_cells
+from select_cells import select_cells
 
 # tests below use config.NAIVE_CONDITION/config.VEM_CONDITION rather than
 # hardcoded strings, so they keep working if the real condition names ever

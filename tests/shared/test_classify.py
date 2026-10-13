@@ -1,13 +1,13 @@
 '''
-Run directly: python3 tests/test_classify.py
+Run directly: python3 tests/shared/test_classify.py
 '''
 import os
 import sys
 
 import pandas as pd
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from helpers.classify import classify_subclass
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.classify import classify_subclass
 
 
 def test_all_eighteen_combined_labels_map_somewhere():

@@ -1,0 +1,96 @@
+import os
+import sys
+
+import pandas as pd
+from joblib import Parallel, delayed
+
+# repo root (where shared/ lives) is two levels up from this analysis's
+# own directory - add it to sys.path so `shared.*` imports resolve when
+# this is run directly as `python main.py` from within this directory
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, REPO_ROOT)
+
+import config
+from load_all_cells import load_all_cells
+from shared.cajal.extract_masks import extract_masks
+from shared.cajal.run_cajal import run_cajal
+from shared.cajal.embed import get_umap_embedding
+
+
+def main():
+    os.makedirs(config.MASKS_DIR, exist_ok=True)
+    os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
+
+    # --- step 1: load metadata, restrict to frames 1-3, use every available cell ---
+    #  unlike naive_vs_vem, there's no sampling budget here - every
+    #  has_mask=True cell in frames 1-3 goes through CAJAL
+    print("[1/4] Loading metadata...")
+    metadata = load_all_cells(config.metadata_csv_path(), config.FRAMES, config.DRUG)
+
+    print(f"  {len(metadata)} cells across frames {sorted(metadata['frame'].unique())}")
+    print("  By subclass:")
+    for subclass, n in metadata['subclass'].value_counts().items():
+        print(f"    {subclass}: {n}")
+
+    selected_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'selected_metadata.csv')
+    metadata.to_csv(selected_path, index=False)
+    print(f"  Saved to {selected_path}")
+
+    # --- step 2: extract masks for every cell ---
+    print("\n[2/4] Extracting masks...")
+    extract_masks(
+        metadata, config.DRUG, config.COMBINED_MASKS_DIR, config.MASKS_DIR,
+        n_jobs=config.N_JOBS, pad_size=config.PAD_SIZE,
+    )
+
+    # --- step 3: run CAJAL once per modality, across all 3 frames together ---
+    #  (masks from every frame land in the same cell/ and nuc/ folders, so
+    #  CAJAL computes one shared distance matrix covering all 3 frames -
+    #  distances are only comparable if they come from the same CAJAL run -
+    #  this is the "one common UMAP" across frames 1-3)
+    print("\n[3/4] Running CAJAL...")
+    cell_dir = os.path.join(config.MASKS_DIR, 'cell')
+    nuc_dir  = os.path.join(config.MASKS_DIR, 'nuc')
+
+    cell_dist_csv = os.path.join(config.CAJAL_OUTPUT_DIR, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
+    nuc_dist_csv  = os.path.join(config.CAJAL_OUTPUT_DIR, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
+
+    # figure out how many of {cell, nuc} actually need to run BEFORE
+    # deciding how many cores to give each one - splitting config.N_JOBS in
+    # half unconditionally would waste half the allocation whenever only
+    # one of the two is still needed (e.g. resuming after a partial run
+    # that already finished one modality)
+    needs_cajal = {
+        'cell': not os.path.exists(cell_dist_csv),
+        'nuc':  not os.path.exists(nuc_dist_csv),
+    }
+    for modality, needed in needs_cajal.items():
+        if not needed:
+            dist_csv = cell_dist_csv if modality == 'cell' else nuc_dist_csv
+            print(f"  Skipping {modality} CAJAL run: {dist_csv} already exists")
+
+    n_tasks = sum(needs_cajal.values())
+    if n_tasks > 0:
+        per_task_jobs = max(1, config.N_JOBS // n_tasks)
+        print(f"  Processing {n_tasks} mask type(s) in parallel ({per_task_jobs} jobs each)...")
+
+        tasks = []
+        if needs_cajal['cell']:
+            tasks.append(delayed(run_cajal)(cell_dir, config.CAJAL_OUTPUT_DIR, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+        if needs_cajal['nuc']:
+            tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+
+        Parallel(n_jobs=n_tasks)(tasks)
+
+    # --- step 4: fit UMAP directly on the CAJAL distances ---
+    print("\n[4/4] Fitting UMAP embeddings...")
+    cell_umap_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_umap.npz')
+    nuc_umap_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_umap.npz')
+    get_umap_embedding(cell_dist_csv, cell_umap_path, seed=config.UMAP_SEED)
+    get_umap_embedding(nuc_dist_csv, nuc_umap_path, seed=config.UMAP_SEED)
+
+    print("\nDone.")
+
+
+if __name__ == '__main__':
+    main()

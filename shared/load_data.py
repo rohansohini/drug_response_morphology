@@ -4,8 +4,6 @@ import re
 import numpy as np
 import pandas as pd
 
-import config
-
 
 def parse_label(label: str) -> tuple[str, int, int]:
     '''
@@ -26,10 +24,13 @@ def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFra
     Merge UMAP coordinates with the selected-cell metadata.
 
     Inputs:
-        labels:    from cajal_pipeline.embed.get_umap_embedding
+        labels:    from shared.cajal.embed.get_umap_embedding
         embedding: (n, 2) UMAP coordinates, same row order as labels
-        selected:  from pipeline.select_cells.select_cells (must have:
-                   condition, frame, pixel_id, subclass, m_label, k_label)
+        selected:  an analysis's own selected-cell DataFrame (e.g. from
+                   naive_vs_vem's select_cells.select_cells, or
+                   vem_48hr_pretreatment's load_all_cells.load_all_cells)
+                   (must have: condition, frame, pixel_id, subclass,
+                   m_label, k_label)
     Outputs:
         df: one row per embedded cell, columns
             [label, condition, frame, pixel_id, umap_0, umap_1, subclass, m_label, k_label]
@@ -67,21 +68,26 @@ def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFra
     return df
 
 
-def load_full_dataset(modality: str) -> pd.DataFrame:
+def load_full_dataset(cajal_output_dir: str, modality: str, metadata_filename: str = 'selected_metadata.csv') -> pd.DataFrame:
     '''
     Load the selected-cell metadata and the UMAP embedding for one
-    modality from disk (config.CAJAL_OUTPUT_DIR), merged into one
-    DataFrame. Thin I/O wrapper around build_dataset for notebook use.
+    modality from disk, merged into one DataFrame. Thin I/O wrapper
+    around build_dataset for notebook use.
 
     Inputs:
-        modality: 'cell' or 'nuc'
+        cajal_output_dir:  directory containing {metadata_filename} and
+                           {modality}_umap.npz - an analysis's own
+                           config.CAJAL_OUTPUT_DIR
+        modality:          'cell' or 'nuc'
+        metadata_filename: filename of the selected-cell metadata CSV
+                           within cajal_output_dir
     Outputs:
         df: from build_dataset - one row per embedded cell
     '''
-    selected_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'selected_metadata.csv')
+    selected_path = os.path.join(cajal_output_dir, metadata_filename)
     selected = pd.read_csv(selected_path)
 
-    umap_path = os.path.join(config.CAJAL_OUTPUT_DIR, f'{modality}_umap.npz')
+    umap_path = os.path.join(cajal_output_dir, f'{modality}_umap.npz')
     data = np.load(umap_path, allow_pickle=True)
 
     return build_dataset(list(data['labels']), data['embedding'], selected)

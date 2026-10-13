@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/test_embed.py
+Run directly: python3 tests/shared/test_embed.py
 '''
 import os
 import sys
@@ -7,7 +7,7 @@ import types
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 # cajal itself needs a full conda environment and won't install in a bare
 # sandbox - stub it out so embed.py's top-level `import cajal.utilities`
@@ -17,8 +17,8 @@ _fake_cajal.utilities = types.ModuleType('cajal.utilities')
 sys.modules['cajal'] = _fake_cajal
 sys.modules['cajal.utilities'] = _fake_cajal.utilities
 
-from cajal_pipeline.embed import reformat_name, get_umap_embedding
-import cajal_pipeline.embed as embed_module
+from shared.cajal.embed import reformat_name, get_umap_embedding
+import shared.cajal.embed as embed_module
 
 
 def test_reformat_name_handles_underscores_in_condition_name():

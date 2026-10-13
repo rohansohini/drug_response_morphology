@@ -1,11 +1,12 @@
 '''
-Run directly: python3 tests/test_allocation.py
+Run directly: python3 tests/analyses/naive_vs_vem/test_allocation.py
 '''
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from pipeline.allocation import water_fill_allocate
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'naive_vs_vem')
+sys.path.insert(0, ANALYSIS_DIR)
+from allocation import water_fill_allocate
 
 
 def test_equal_distribution_when_capacity_allows():

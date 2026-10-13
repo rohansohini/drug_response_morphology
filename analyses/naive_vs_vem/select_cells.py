@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 
 import config
-from helpers.classify import classify_subclass
-from pipeline.allocation import water_fill_allocate
+from shared.classify import classify_subclass
+from allocation import water_fill_allocate
 
 
 def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame:

@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/test_load_data.py
+Run directly: python3 tests/shared/test_load_data.py
 '''
 import os
 import sys
@@ -7,8 +7,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from helpers.load_data import parse_label, build_dataset
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.load_data import parse_label, build_dataset
 
 
 def test_parse_label_handles_underscores_in_condition_name():

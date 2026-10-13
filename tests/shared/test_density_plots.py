@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/test_density_plots.py
+Run directly: python3 tests/shared/test_density_plots.py
 '''
 import os
 import sys
@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from helpers.density_plots import plot_umap_with_kde, export_kde_by_frame
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.density_plots import plot_umap_with_kde, export_kde_by_frame
 
 
 def test_legend_shows_well_sampled_groups_only():
