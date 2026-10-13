@@ -21,8 +21,20 @@ def append_labels(df: pd.DataFrame, labels_path: str) -> pd.DataFrame:
     df         = df.copy()
     class_data = pd.DataFrame(loadmat(labels_path)['cloneClassification'])
 
-    assert df['lin_id'].max() <= len(class_data), (
-        f"lin_id max ({df['lin_id'].max()}) exceeds cloneClassification length ({len(class_data)})"
+    # an exact match, not just an upper bound - cloneClassification is
+    # expected to have exactly one row per lineage, since each lin_id is
+    # used directly as a 1-indexed row position into it (see the lookup
+    # below). cloneClassification having MORE rows than lin_id needs would
+    # previously pass silently - that's exactly the kind of symptom you'd
+    # see if cloneClassification were computed over a different lineage
+    # set than this run's track tables produced, which would mean every
+    # row index still "works" but may not refer to the lineage we think
+    # it does.
+    assert df['lin_id'].max() == len(class_data), (
+        f"lin_id max ({df['lin_id'].max()}) does not exactly match cloneClassification length "
+        f"({len(class_data)}) - expected exactly one row per lineage. A mismatch in either "
+        f"direction means lin_id numbering and cloneClassification's row order may not "
+        f"correspond to the same lineage set."
     )
 
     # map each lin_id to its label pair (lin_id is 1-indexed)
