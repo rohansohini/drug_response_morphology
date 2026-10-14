@@ -13,14 +13,16 @@ from pipeline.combine_tracks     import combine_tracks
 from pipeline.utils.image_utils  import save_failure_examples
 
 
-def process_drug(drug: str, drug_dir: str) -> None:
+def process_drug(drug: str, drug_dir: str, day0_frame: int) -> None:
     '''
     Run the full pipeline for a single drug condition.
 
     Inputs:
-        drug:     drug condition name (e.g. 'naive', 'vemurafenib')
-        drug_dir: path to this drug's raw data root (contains Cropped_XX/,
-                  Output_Segmentation/, clone_kmeans_id.mat - see config.DRUG_DIRS)
+        drug:       drug condition name (e.g. 'naive', 'vemurafenib')
+        drug_dir:   path to this drug's raw data root (contains Cropped_XX/,
+                    Output_Segmentation/, clone_kmeans_id.mat - see config.DRUG_DIRS)
+        day0_frame: frame number (1-indexed) this drug was added on - see
+                    config.DAY0_FRAMES
     '''
     print(f"\n{'='*50}")
     print(f"Processing: {drug}")
@@ -48,7 +50,7 @@ def process_drug(drug: str, drug_dir: str) -> None:
     # --- step 2: append lineage classification labels ---
     print("\n[2/7] Appending classification labels...")
     t = time.time()
-    df = append_labels(df, labels_path)
+    df = append_labels(df, labels_path, day0_frame)
     print(f"  Done ({time.time()-t:.1f}s)")
 
     # --- step 3: load nuclear data ---
@@ -145,6 +147,13 @@ def process_drug(drug: str, drug_dir: str) -> None:
 def main():
     os.makedirs(config.COMBINED_MASKS_DIR, exist_ok=True)
 
+    missing_day0 = set(config.DRUG_DIRS) - set(config.DAY0_FRAMES)
+    assert not missing_day0, (
+        f"config.DAY0_FRAMES is missing entry/entries for: {sorted(missing_day0)} - every drug in "
+        f"DRUG_DIRS must specify which frame day 0 (drug addition) falls on, since it controls how "
+        f"lineage classification labels get paired with cells (see pipeline/append_labels.py)"
+    )
+
     print(f"Found conditions: {list(config.DRUG_DIRS.keys())}")
 
     for drug, drug_dir in config.DRUG_DIRS.items():
@@ -157,7 +166,7 @@ def main():
             print(f"\nSkipping {drug}: {out_path} already exists")
             continue
 
-        process_drug(drug, drug_dir)
+        process_drug(drug, drug_dir, config.DAY0_FRAMES[drug])
 
 
 if __name__ == '__main__':
