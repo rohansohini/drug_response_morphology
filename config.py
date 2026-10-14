@@ -34,8 +34,11 @@ DRUG_DIRS = {
 ##############################################################
 
 DAY0_FRAMES = {
-    'A2_naive':   1,
-    'A1_1uM_vem': 1,
+    'naive':           1,
+    'vem_1uM':         1,
+    'vem_48hrsbefore': 3,   # imaging starts 2 days before the drug is added on frame 3
+    'gem_2.5nM':       1,
+    'tram_6nM':        1,
 }
 
 ##############################################################
