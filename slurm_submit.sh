@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=p32655
+#SBATCH --account=b1042
 #SBATCH --partition=short
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
@@ -11,7 +11,7 @@
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /projects/p32655/sohini/process_imaging_data/
+cd /projects/b1042/GoyalLab/sohini/process_imaging_data/
 conda activate process_imaging
 
 mkdir -p logs
