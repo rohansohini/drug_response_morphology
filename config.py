@@ -11,8 +11,11 @@ import os
 ##############################################################
 
 DRUG_DIRS = {
-    'A2_naive':   '/path/to/A2_naive/drug_dir',
-    'A1_1uM_vem': '/path/to/A1_1uM_vem/drug_dir',
+    'naive':   '/projects/b1042/GoyalLab/sohini/raw_data/naive',
+    'vem_1uM': '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM',
+    'vem_48hrsbefore': '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM_48hrsbefore',
+    'gem_2.5nM': '/projects/b1042/GoyalLab/sohini/raw_data/gem_2.5nM',
+    'tram_6nM': '/projects/b1042/GoyalLab/sohini/raw_data/tram_6nM'
 }
 
 ##############################################################
