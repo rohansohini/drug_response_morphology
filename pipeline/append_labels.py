@@ -14,7 +14,7 @@ def append_labels(df: pd.DataFrame, labels_path: str) -> pd.DataFrame:
 
     Inputs:
         df:          cell track DataFrame (must have: lin_id)
-        labels_path: path to sorted_idx.mat file
+        labels_path: path to clone_kmeans_id.mat file
     Outputs:
         df: input DataFrame with m_label and k_label columns added
     '''

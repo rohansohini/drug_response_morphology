@@ -20,7 +20,7 @@ def process_drug(drug: str, drug_dir: str) -> None:
     Inputs:
         drug:     drug condition name (e.g. 'naive', 'vemurafenib')
         drug_dir: path to this drug's raw data root (contains Cropped_XX/,
-                  Output_Segmentation/, sorted_idx.mat - see config.DRUG_DIRS)
+                  Output_Segmentation/, clone_kmeans_id.mat - see config.DRUG_DIRS)
     '''
     print(f"\n{'='*50}")
     print(f"Processing: {drug}")
@@ -29,7 +29,7 @@ def process_drug(drug: str, drug_dir: str) -> None:
 
     # --- paths ---
     seg_mask_dir = drug_dir
-    labels_path  = os.path.join(drug_dir, 'sorted_idx.mat')
+    labels_path  = os.path.join(drug_dir, 'clone_kmeans_id.mat')
 
     # --- step 1: discover and load cell track tables ---
     print("\n[1/7] Discovering and loading track tables...")

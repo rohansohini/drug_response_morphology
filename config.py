@@ -7,7 +7,7 @@ import os
 #   Cropped_XX/track_table_*.mat
 #   Cropped_XX/segmentation_info_*.mat
 #   Output_Segmentation/Transmission_region_XX/Transmission_YY_masks.tiff
-#   sorted_idx.mat
+#   clone_kmeans_id.mat
 ##############################################################
 
 DRUG_DIRS = {

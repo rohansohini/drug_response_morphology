@@ -40,7 +40,7 @@ Raw data is **not** stored inside this repo - each drug condition's data lives w
 
 ```
 {drug_dir}/
-├── sorted_idx.mat
+├── clone_kmeans_id.mat
 ├── Cropped_XX/
 │   ├── track_table_*.mat
 │   └── segmentation_info_*.mat
@@ -54,7 +54,7 @@ Where:
 - `Cropped_XX/` — one folder per track (`XX` ranges 1-25); **only the folder's own number is trusted as the track number** - the numbers embedded in `track_table_*.mat` and `segmentation_info_*.mat` filenames inside it are not reliably correct, so each is found by globbing the folder for exactly one match rather than by constructing an exact filename (see `pipeline/discover_raw_data.py`)
 - `track_table_*.mat` — cell track data for that folder's track
 - `segmentation_info_*.mat` — nuclear segmentation data for that folder's track
-- `sorted_idx.mat` — lineage classification labels (`cloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
+- `clone_kmeans_id.mat` — lineage classification labels (`cloneClassification`), one row per lineage: column 0 is the broad class (`m_label`), column 1 is the sub-class (`k_label`)
 - `Output_Segmentation/Transmission_region_XX/` — cell segmentation masks, one folder per track
 - `Transmission_YY_masks.tiff` — segmentation mask, one per frame
 
