@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=b1042
-#SBATCH --partition=short
+#SBATCH --partition=genomics
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --mem=64G
