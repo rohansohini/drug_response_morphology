@@ -35,9 +35,10 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
         selected: an analysis's own selected-cell DataFrame (e.g. from
                   naive_vs_vem's select_cells.select_cells, or
                   vem_48hr_pretreatment's load_all_cells.load_all_cells)
-                  (must have: condition, frame, pixel_id, subclass; any
-                  other columns - m_label, k_label, lin_id, node_id, etc. -
-                  are carried through too, whatever `selected` happens to have)
+                  (must have: condition, frame, pixel_id; every other
+                  column - subclass, m_label, k_label, lin_id, node_id,
+                  etc. - is carried through too, whatever `selected`
+                  happens to have, and none of them are required)
     Outputs:
         df: one row per label, in the SAME row order as `labels` (so row
             i still corresponds to a distance matrix's row/col i), with
@@ -62,15 +63,20 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
         f"the merge below would silently duplicate rows for those cells rather than erroring"
     )
 
-    df = df.merge(meta, on=['condition', 'frame', 'pixel_id'], how='left')
+    # indicator=True, rather than checking some particular column for NaN,
+    # detects an unmatched row correctly regardless of which columns
+    # `selected` happens to have (some analyses, e.g. vem_48hr_pretreatment's
+    # frame-1-only metadata, have no 'subclass' column at all to check)
+    df = df.merge(meta, on=['condition', 'frame', 'pixel_id'], how='left', indicator=True)
 
-    n_unmatched = df['subclass'].isna().sum()
+    n_unmatched = (df['_merge'] == 'left_only').sum()
     if n_unmatched > 0:
         raise ValueError(
             f"{n_unmatched}/{len(df)} embedded cells had no matching row in `selected` metadata "
             f"when looked up by (condition, frame, pixel_id) - check that `selected` covers every "
             f"cell CAJAL was run on."
         )
+    df = df.drop(columns='_merge')
 
     return df
 

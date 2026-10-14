@@ -38,16 +38,15 @@ def main():
     os.makedirs(config.MASKS_DIR, exist_ok=True)
     os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
 
-    # --- step 1: load metadata, restrict to frames 1-3, use every available cell ---
+    # --- step 1: load metadata, restrict to config.FRAMES (frame 1 only), use every available cell ---
     #  unlike naive_vs_vem, there's no sampling budget here - every
-    #  has_mask=True cell in frames 1-3 goes through CAJAL
+    #  has_mask=True frame-1 cell goes through CAJAL. No subclass here -
+    #  process_imaging_data doesn't classify frame-1 cells (classification
+    #  starts at day 0) - see lineage_fate.py for each cell's fate mixture.
     print("[1/4] Loading metadata...")
     metadata = load_all_cells(config.metadata_csv_path(), config.FRAMES, config.DRUG)
 
     print(f"  {len(metadata)} cells across frames {sorted(metadata['frame'].unique())}")
-    print("  By subclass:")
-    for subclass, n in metadata['subclass'].value_counts().items():
-        print(f"    {subclass}: {n}")
 
     selected_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'selected_metadata.csv')
     metadata.to_csv(selected_path, index=False)
@@ -60,11 +59,7 @@ def main():
         n_jobs=config.N_JOBS, pad_size=config.PAD_SIZE,
     )
 
-    # --- step 3: run CAJAL once per modality, across all 3 frames together ---
-    #  (masks from every frame land in the same cell/ and nuc/ folders, so
-    #  CAJAL computes one shared distance matrix covering all 3 frames -
-    #  distances are only comparable if they come from the same CAJAL run -
-    #  this is the "one common UMAP" across frames 1-3)
+    # --- step 3: run CAJAL once per modality, on frame-1 cells only ---
     print("\n[3/4] Running CAJAL...")
     cell_dir = os.path.join(config.MASKS_DIR, 'cell')
     nuc_dir  = os.path.join(config.MASKS_DIR, 'nuc')

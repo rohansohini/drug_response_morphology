@@ -1,12 +1,16 @@
 import os
 
 ###### This dataset
-#  vem_1uM_48hrsbefore in process_imaging_data: frames 1-2 are BEFORE drug
-#  addition (pre-treatment baseline), frame 3 is day 0 (when 1uM
-#  vemurafenib was added). Every available cell/nucleus across these 3
-#  frames goes through CAJAL - no sampling budget, unlike naive_vs_vem.
+#  vem_1uM_48hrsbefore in process_imaging_data: frame 1 is day -2 (2 days
+#  BEFORE drug addition), frame 3 is day 0 (when 1uM vemurafenib was
+#  added). This analysis only ever looks at frame 1 - its cells don't get
+#  a classification from process_imaging_data (classification starts at
+#  day 0), so each frame-1 cell instead gets a fate-mixture percentage
+#  (see lineage_fate.py) from its day-0 descendants. Every available
+#  frame-1 cell/nucleus goes through CAJAL - no sampling budget, unlike
+#  naive_vs_vem.
 DRUG   = 'vem_1uM_48hrsbefore'
-FRAMES = [1, 2, 3]
+FRAMES = [1]
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own

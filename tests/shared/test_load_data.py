@@ -82,6 +82,27 @@ def test_build_dataset_raises_on_duplicate_metadata_key():
     raise AssertionError("expected build_dataset to raise on a duplicate (condition, frame, pixel_id) key")
 
 
+def test_match_labels_to_metadata_works_without_a_subclass_column():
+    # regression test: match_labels_to_metadata used to detect unmatched
+    # rows by checking the 'subclass' column for NaN, which breaks for
+    # any analysis whose `selected` has no subclass at all (e.g.
+    # vem_48hr_pretreatment's frame-1-only metadata, since
+    # process_imaging_data doesn't classify frame-1 cells) - must work
+    # (and still correctly raise on a genuinely unmatched cell) regardless
+    labels = ['naive_frame_1_pixel_1', 'naive_frame_1_pixel_999']  # second has no match
+    selected = pd.DataFrame({
+        'condition': ['naive'], 'frame': [1], 'pixel_id': [1], 'lin_id': [7],
+    })
+
+    try:
+        match_labels_to_metadata(labels, selected)
+    except ValueError as e:
+        assert 'unmatched' in str(e).lower() or 'no matching' in str(e).lower()
+        print("PASS: match_labels_to_metadata works (and still raises on unmatched cells) with no subclass column")
+        return
+    raise AssertionError("expected match_labels_to_metadata to raise on the unmatched cell")
+
+
 def test_match_labels_to_metadata_carries_through_every_selected_column():
     # regression test: match_labels_to_metadata used to hardcode a 6-column
     # subset (condition, frame, pixel_id, subclass, m_label, k_label),
@@ -107,5 +128,6 @@ if __name__ == '__main__':
     test_build_dataset_merges_correctly()
     test_build_dataset_raises_on_unmatched_cell()
     test_build_dataset_raises_on_duplicate_metadata_key()
+    test_match_labels_to_metadata_works_without_a_subclass_column()
     test_match_labels_to_metadata_carries_through_every_selected_column()
     print("\nAll tests passed.")

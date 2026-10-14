@@ -22,14 +22,12 @@ Compares cell and nuclear morphology between `naive` and `A1_1uM_vem` conditions
 
 ### `vem_48hr_pretreatment`
 
-For the `vem_1uM_48hrsbefore` dataset: frames 1-2 are *before* drug addition (pre-treatment baseline), frame 3 is day 0 (when 1µM vemurafenib was added).
+For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug addition), frame 3 is day 0 (when 1µM vemurafenib was added). This analysis only ever looks at **frame 1** (`config.FRAMES = [1]`) - `process_imaging_data` doesn't classify a cell until day 0, so a frame-1 cell has no single subclass to compare across frames; the question here is whether a cell's shape *before* treatment relates to what it eventually becomes.
 
-1. **Uses every available cell/nucleus** across frames 1-3 - no sampling budget, unlike `naive_vs_vem` (`load_all_cells.py`).
-2. **Runs CAJAL** once per modality on all 3 frames together, so distances are comparable across them.
-3. **Fits one shared UMAP** directly on that distance matrix.
-4. **`01_subclass_by_frame.ipynb`** plots each frame on that shared embedding, colored by subclass via KDE contours - one combined PDF per modality (3 pages, one per frame), so 2 files / 6 plots total.
-5. **`02_subclass_separation_stats.ipynb`** tests, per frame per modality, whether the 4 subclasses are statistically distinguishable - PERMANOVA + PERMDISP directly on CAJAL's GW distance matrix (never the UMAP projection, which distorts distances), plus pairwise subclass comparisons with Benjamini-Hochberg correction. See "Statistical testing" below.
-6. **`03_frame1_fate_mixture.ipynb`** looks only at frame 1 (day -2, 2 days before the drug is added) and asks whether a cell's *shape* that early relates to what its lineage eventually becomes by day 0. Each frame-1 cell gets a fate-mixture (`%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, from `lineage_frame3_to_frame1.mat`) rather than one hard label, since a frame-1 lineage can already have split into several differently-fated day-0 descendants - visualized as a weighted KDE per fate category over a frame-1-only UMAP (`shared/density_plots.py`'s `plot_umap_with_weighted_kde`). See `lineage_fate.py` for how the raw, track-local lineage IDs get resolved to this analysis's existing `lin_id`s.
+1. **Uses every available frame-1 cell/nucleus** - no sampling budget, unlike `naive_vs_vem` (`load_all_cells.py`).
+2. **Runs CAJAL** once per modality on frame-1 cells, then fits UMAP directly on that distance matrix.
+3. **Resolves each frame-1 lineage's eventual fate mixture** (`lineage_fate.py`): a frame-1 lineage can already have divided by day 0 (e.g. 3 cells at frame 1 expanding to 100 by day 0), and each of those day-0 descendants can land in a *different* subclass - so instead of one hard label, each frame-1 cell gets `%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, resolved from `lineage_frame3_to_frame1.mat` and `clone_kmeans_id.mat` (raw, track-local lineage IDs resolved to this analysis's own `lin_id` by reusing `process_imaging_data`'s `load_track`/`make_master_ids` directly).
+4. **`01_frame1_fate_mixture.ipynb`** plots that mixture as a weighted KDE per fate category over the frame-1 UMAP - every cell contributes to every category's contour in proportion to its own percentage in that category, rather than being forced into one dominant-fate bucket (`shared/density_plots.py`'s `plot_umap_with_weighted_kde`).
 
 ---
 
@@ -44,8 +42,7 @@ drug_response_morphology/
 │   │   └── embed.py                   # loads the distance matrix; UMAP on it
 │   ├── classify.py                    # m_label/k_label -> subclass (fixed scheme)
 │   ├── load_data.py                   # merges UMAP coordinates / distance-matrix labels with metadata
-│   ├── density_plots.py               # shared KDE-over-UMAP plotting, PDF export
-│   └── permanova.py                   # PERMANOVA/PERMDISP on the distance matrix, BH correction
+│   └── density_plots.py               # shared KDE-over-UMAP plotting (hard-label and weighted), PDF export
 ├── analyses/
 │   ├── naive_vs_vem/
 │   │   ├── main.py                    # runs the pipeline end to end
@@ -58,7 +55,7 @@ drug_response_morphology/
 │   └── vem_48hr_pretreatment/
 │       ├── main.py
 │       ├── config.py                  # dataset name, frames, paths
-│       ├── load_all_cells.py          # loads + classifies every available cell
+│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
 │       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
 │       ├── slurm_submit.sh
 │       ├── notebooks/
@@ -153,25 +150,6 @@ Fixed and universal across every analysis (`shared/classify.py`), from `process_
 | `persisting` | `m_label == 2` |
 | `slow_prolif` | `m_label == 3` and `k_label` in {1, 2} |
 | `fast_prolif` | `m_label == 3` and `k_label` in {3, 4, 5, 6} |
-
----
-
-## Statistical testing
-
-`shared/permanova.py` (used by `vem_48hr_pretreatment/notebooks/02_subclass_separation_stats.ipynb`) tests whether a categorical grouping (e.g. subclass) is statistically distinguishable in morphology - operating directly on CAJAL's Gromov-Wasserstein distance matrix, **never** on a UMAP projection of it. UMAP optimizes a 2D layout for visual cluster separation, not for preserving actual distances, so it is the wrong representation for any quantitative claim, including a statistical test.
-
-Two complementary, permutation-based tests are run together, because a significant result from one alone is ambiguous:
-
-| Test | Question | Sensitive to |
-|---|---|---|
-| `permanova()` (Anderson 2001) | Do groups occupy different *locations* in distance space? | Location, but also dispersion |
-| `permdisp()` (Anderson 2006) | Do groups differ in *dispersion* (spread)? | Dispersion only |
-
-A PERMANOVA hit with no PERMDISP hit is a clean location effect. A hit on both is ambiguous - part or all of the PERMANOVA signal may be a dispersion difference rather than a location difference, so the notebook reports both outcomes side by side rather than reading PERMANOVA alone as evidence of separation.
-
-`permanova_pairwise()` runs PERMANOVA on every pair of groups and applies `benjamini_hochberg()` FDR correction across the pairs (e.g. the 6 pairwise subclass comparisons within one frame) - use the resulting `q_value`, not the raw `p_value`, to judge pairwise significance.
-
-All three report an effect size (`R2` for PERMANOVA, `mean_dispersion` per group for PERMDISP) alongside the permutation p-value, since p-values alone are close to meaningless at the cell counts these analyses work with (thousands of cells per frame).
 
 ---
 
