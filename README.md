@@ -29,6 +29,7 @@ For the `vem_1uM_48hrsbefore` dataset: frames 1-2 are *before* drug addition (pr
 3. **Fits one shared UMAP** directly on that distance matrix.
 4. **`01_subclass_by_frame.ipynb`** plots each frame on that shared embedding, colored by subclass via KDE contours - one combined PDF per modality (3 pages, one per frame), so 2 files / 6 plots total.
 5. **`02_subclass_separation_stats.ipynb`** tests, per frame per modality, whether the 4 subclasses are statistically distinguishable - PERMANOVA + PERMDISP directly on CAJAL's GW distance matrix (never the UMAP projection, which distorts distances), plus pairwise subclass comparisons with Benjamini-Hochberg correction. See "Statistical testing" below.
+6. **`03_frame1_fate_mixture.ipynb`** looks only at frame 1 (day -2, 2 days before the drug is added) and asks whether a cell's *shape* that early relates to what its lineage eventually becomes by day 0. Each frame-1 cell gets a fate-mixture (`%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, from `lineage_frame3_to_frame1.mat`) rather than one hard label, since a frame-1 lineage can already have split into several differently-fated day-0 descendants - visualized as a weighted KDE per fate category over a frame-1-only UMAP (`shared/density_plots.py`'s `plot_umap_with_weighted_kde`). See `lineage_fate.py` for how the raw, track-local lineage IDs get resolved to this analysis's existing `lin_id`s.
 
 ---
 
@@ -58,6 +59,7 @@ drug_response_morphology/
 │       ├── main.py
 │       ├── config.py                  # dataset name, frames, paths
 │       ├── load_all_cells.py          # loads + classifies every available cell
+│       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
 │       ├── slurm_submit.sh
 │       ├── notebooks/
 │       └── output/                    # generated (gitignored)

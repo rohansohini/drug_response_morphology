@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.density_plots import plot_umap_with_kde, export_kde_by_frame
+from shared.density_plots import plot_umap_with_kde, export_kde_by_frame, plot_umap_with_weighted_kde
 
 
 def test_legend_shows_well_sampled_groups_only():
@@ -184,10 +184,121 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
     print("PASS: export_kde_by_frame applies identical axis limits across every frame's page")
 
 
+def test_weighted_kde_contours_are_unfilled_outlines_at_default_levels():
+    # regression test: plot_umap_with_weighted_kde must draw unfilled
+    # contour lines (fill=False) at exactly the default levels
+    # (0.5, 0.7, 0.9), matching the same outline-only convention as the
+    # hard-label version.
+    rng = np.random.default_rng(0)
+    n = 100
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, n),
+        'umap_1': rng.normal(0, 1, n),
+        'pct_dying': rng.uniform(0, 1, n),
+    })
+
+    fig, ax = plt.subplots()
+    plot_umap_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title')
+
+    from matplotlib.contour import QuadContourSet
+    contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
+    assert len(contour_sets) == 1, f"expected exactly one KDE contour set, got {len(contour_sets)}"
+    assert contour_sets[0].get_fill() is False, "expected an unfilled (outline-only) KDE contour"
+    assert len(contour_sets[0].levels) == 3, \
+        f"expected exactly 3 contour levels (0.5, 0.7, 0.9), got {len(contour_sets[0].levels)}"
+
+    print("PASS: weighted KDE contours are drawn as unfilled outlines at exactly 3 levels")
+
+
+def test_weighted_kde_follows_the_weighted_region_not_just_point_density():
+    # the central behavior this function exists for: two well-separated
+    # clusters with EQUAL point density, but weight for 'dying' concentrated
+    # almost entirely in cluster A and weight for 'persisting' concentrated
+    # almost entirely in cluster B - each contour must center on its OWN
+    # weighted cluster, not some density-only average of both.
+    rng = np.random.default_rng(0)
+    n = 150
+    pts = np.vstack([rng.normal([0, 0], 0.5, (n, 2)), rng.normal([20, 20], 0.5, (n, 2))])
+    df = pd.DataFrame({'umap_0': pts[:, 0], 'umap_1': pts[:, 1]})
+    df['pct_dying']      = np.concatenate([np.full(n, 0.9), np.full(n, 0.1)])
+    df['pct_persisting'] = 1 - df['pct_dying']
+
+    fig, ax = plt.subplots()
+    plot_umap_with_weighted_kde(
+        df, {'dying': 'pct_dying', 'persisting': 'pct_persisting'},
+        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title',
+    )
+
+    from matplotlib.contour import QuadContourSet
+    contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
+    assert len(contour_sets) == 2, f"expected 2 contour sets (dying, persisting), got {len(contour_sets)}"
+
+    def centroid(cs):
+        verts = np.concatenate([p.vertices for p in cs.get_paths()])
+        return verts.mean(axis=0)
+
+    dying_centroid, persisting_centroid = centroid(contour_sets[0]), centroid(contour_sets[1])
+
+    assert np.allclose(dying_centroid, [0, 0], atol=2), \
+        f"expected 'dying' contour centered near (0,0) where its weight concentrates, got {dying_centroid}"
+    assert np.allclose(persisting_centroid, [20, 20], atol=2), \
+        f"expected 'persisting' contour centered near (20,20) where its weight concentrates, got {persisting_centroid}"
+
+    print("PASS: each weighted KDE contour follows its own weight's concentration, not shared point density")
+
+
+def test_weighted_kde_skips_a_group_below_min_total_weight():
+    rng = np.random.default_rng(0)
+    n = 50
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, n),
+        'umap_1': rng.normal(0, 1, n),
+        'pct_dying':      np.full(n, 0.5),
+        'pct_persisting': np.full(n, 0.01),  # total weight 0.5 - well below min_total_weight
+    })
+
+    fig, ax = plt.subplots()
+    plot_umap_with_weighted_kde(
+        df, {'dying': 'pct_dying', 'persisting': 'pct_persisting'},
+        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title', min_total_weight=5,
+    )
+
+    legend = ax.get_legend()
+    labels = [t.get_text() for t in legend.get_texts()]
+    assert len(labels) == 1 and 'dying' in labels[0], \
+        f"expected only 'dying' in the legend (persisting's total weight is below min_total_weight), got {labels}"
+
+    print("PASS: a group whose total weight is below min_total_weight is skipped entirely")
+
+
+def test_weighted_kde_legend_shows_total_weight():
+    rng = np.random.default_rng(0)
+    n = 40
+    df = pd.DataFrame({
+        'umap_0': rng.normal(0, 1, n),
+        'umap_1': rng.normal(0, 1, n),
+        'pct_dying': np.full(n, 0.8),
+    })
+
+    fig, ax = plt.subplots()
+    plot_umap_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title')
+
+    legend = ax.get_legend()
+    labels = [t.get_text() for t in legend.get_texts()]
+    assert len(labels) == 1
+    assert 'total weight=32.0' in labels[0], f"expected total weight 32.0 (40*0.8) in label, got {labels}"
+
+    print("PASS: weighted KDE legend reports each group's total weight")
+
+
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_umap_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()
+    test_weighted_kde_contours_are_unfilled_outlines_at_default_levels()
+    test_weighted_kde_follows_the_weighted_region_not_just_point_density()
+    test_weighted_kde_skips_a_group_below_min_total_weight()
+    test_weighted_kde_legend_shows_total_weight()
     print("\nAll tests passed.")

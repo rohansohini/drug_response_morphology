@@ -35,19 +35,20 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
         selected: an analysis's own selected-cell DataFrame (e.g. from
                   naive_vs_vem's select_cells.select_cells, or
                   vem_48hr_pretreatment's load_all_cells.load_all_cells)
-                  (must have: condition, frame, pixel_id, subclass,
-                  m_label, k_label)
+                  (must have: condition, frame, pixel_id, subclass; any
+                  other columns - m_label, k_label, lin_id, node_id, etc. -
+                  are carried through too, whatever `selected` happens to have)
     Outputs:
         df: one row per label, in the SAME row order as `labels` (so row
             i still corresponds to a distance matrix's row/col i), with
-            columns [label, condition, frame, pixel_id, subclass,
-            m_label, k_label]
+            columns [label, condition, frame, pixel_id, <every other
+            column `selected` has>]
     '''
     parsed = [parse_label(l) for l in labels]
     df = pd.DataFrame(parsed, columns=['condition', 'frame', 'pixel_id'])
     df.insert(0, 'label', labels)
 
-    meta = selected[['condition', 'frame', 'pixel_id', 'subclass', 'm_label', 'k_label']]
+    meta = selected
 
     # a duplicate (condition, frame, pixel_id) key in meta would silently
     # fan out matching rows in the merge below (confirmed directly: a

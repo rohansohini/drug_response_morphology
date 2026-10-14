@@ -58,6 +58,62 @@ def plot_umap_with_kde(df, group_col, group_colors, ax, title, min_group_size=5,
     ax.legend(handles=legend_handles, fontsize=8)
 
 
+def plot_umap_with_weighted_kde(df, weight_cols, group_colors, ax, title, min_total_weight=5, levels=(0.5, 0.7, 0.9), xlim=None, ylim=None):
+    '''
+    Like plot_umap_with_kde, but for cells with a MIXTURE of group
+    membership instead of one hard label - e.g. each cell has its own
+    %dying/%persisting/%slow_prolif/%fast_prolif fate breakdown, rather
+    than being classified as exactly one of those. One weighted KDE
+    contour per group, where every cell contributes to EVERY group's
+    contour in proportion to its own percentage in that group (via
+    seaborn's native `weights` support), instead of being forced into
+    exactly one group's contour and omitted from the rest.
+
+    Inputs:
+        df:               must have: umap_0, umap_1, and one column per
+                          weight_cols value
+        weight_cols:      {group_value: column name in df holding that
+                          group's per-cell weight (e.g. 0-1 fraction or
+                          0-100 percentage - only relative scale matters,
+                          seaborn normalizes internally)} - also
+                          determines which groups get plotted and their
+                          legend order
+        group_colors:     {group_value: color}
+        ax:               matplotlib axis to plot on
+        title:            plot title
+        min_total_weight: skip a group's KDE contour if its weights sum
+                          to less than this across every cell (mirrors
+                          plot_umap_with_kde's min_group_size - a KDE
+                          built from almost no weight is noise, not signal)
+        levels:           iso-proportion levels to draw as unfilled
+                          contour lines (outline only, no fill)
+        xlim, ylim:       see plot_umap_with_kde
+    '''
+    ax.scatter(df['umap_0'], df['umap_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
+
+    legend_handles = []
+    for group, color in group_colors.items():
+        weights = df[weight_cols[group]].to_numpy()
+        total_weight = weights.sum()
+        if total_weight < min_total_weight:
+            continue
+        sns.kdeplot(
+            x=df['umap_0'], y=df['umap_1'], weights=weights, ax=ax,
+            color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
+        )
+        legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5,
+                                      label=f'{group} (total weight={total_weight:.1f})'))
+
+    ax.set_title(title)
+    ax.set_xlabel('UMAP 1')
+    ax.set_ylabel('UMAP 2')
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    ax.legend(handles=legend_handles, fontsize=8)
+
+
 def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, title_prefix=None, min_group_size=5):
     '''
     One combined, multi-page PDF (one page per frame present in df), plus

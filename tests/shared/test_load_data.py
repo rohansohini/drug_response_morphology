@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.load_data import parse_label, build_dataset
+from shared.load_data import parse_label, build_dataset, match_labels_to_metadata
 
 
 def test_parse_label_handles_underscores_in_condition_name():
@@ -82,9 +82,30 @@ def test_build_dataset_raises_on_duplicate_metadata_key():
     raise AssertionError("expected build_dataset to raise on a duplicate (condition, frame, pixel_id) key")
 
 
+def test_match_labels_to_metadata_carries_through_every_selected_column():
+    # regression test: match_labels_to_metadata used to hardcode a 6-column
+    # subset (condition, frame, pixel_id, subclass, m_label, k_label),
+    # silently dropping anything else `selected` had (e.g. lin_id, needed
+    # by vem_48hr_pretreatment's frame-1 fate-mixture analysis to resolve
+    # lineage_frame3_to_frame1.mat matches) - every column must now pass through
+    labels = ['naive_frame_1_pixel_1']
+    selected = pd.DataFrame({
+        'condition': ['naive'], 'frame': [1], 'pixel_id': [1],
+        'subclass': ['fast_prolif'], 'm_label': [3], 'k_label': [4],
+        'lin_id': [42], 'node_id': [7],
+    })
+
+    df = match_labels_to_metadata(labels, selected)
+
+    assert df.iloc[0]['lin_id'] == 42
+    assert df.iloc[0]['node_id'] == 7
+    print("PASS: match_labels_to_metadata carries through every column `selected` has, not just a hardcoded subset")
+
+
 if __name__ == '__main__':
     test_parse_label_handles_underscores_in_condition_name()
     test_build_dataset_merges_correctly()
     test_build_dataset_raises_on_unmatched_cell()
     test_build_dataset_raises_on_duplicate_metadata_key()
+    test_match_labels_to_metadata_carries_through_every_selected_column()
     print("\nAll tests passed.")
