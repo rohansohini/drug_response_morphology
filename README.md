@@ -68,7 +68,7 @@ The pipeline runs end-to-end for each drug condition in `config.DRUG_DIRS`. Step
 
 **2. `track_table.py`** — Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks. Rows beyond `config.MAX_FRAME` are dropped here, before any of the expensive per-frame mask work below runs.
 
-**3. `append_labels.py`** — Append lineage classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per lineage alive at or after `config.DAY0_FRAMES[drug]` (day 0 - the frame the drug was actually added on), broadcast to all rows sharing that `lin_id`, including that lineage's rows from before day 0. A lineage that dies before day 0 gets `NaN` labels - no classification exists for it. See "Day 0 and lineage classification" below.
+**3. `append_labels.py`** — Append classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per *cell* present at `config.DAY0_FRAMES[drug]` (day 0 - the frame the drug was actually added on), propagated forward to each day-0 cell's own descendants via the `node_id`/`pred_node_id` chain. Cells before day 0, or from a lineage that dies out before reaching it, get `NaN` labels. See "Day 0 and Cell Classification" below.
 
 **4. `load_nuclear_data.py`** — Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts. Also restricted to `config.MAX_FRAME`.
 
@@ -99,7 +99,7 @@ One row per cell per frame with the following columns:
 | `has_mask` | True if cell was matched to a nucleus and passed blob resolution |
 | `pixel_dup` | True if cell shared a pixel ID with another cell in the same `(track, frame)` |
 | `mask_fail_reason` | Reason for `has_mask=False`: `none`, `no_nuc_match` (no nucleus found, NaN, or empty array), `no_cell_seg`, `pixel_dup`, `multi_nuc`, `nuc_outside_cell`, `multi_cell` |
-| `m_label` | Broad lineage class: `1` = dying, `2` = persister, `3` = proliferator. `NaN` if this lineage died before day 0 (see below) - no classification exists for it |
+| `m_label` | Broad class: `1` = dying, `2` = persister, `3` = proliferator. `NaN` for a cell before day 0, or whose lineage died before reaching it (see below) - no classification exists for it |
 | `k_label` | Sub-class (1-6) within `m_label`, for a total of 18 combined labels. `NaN` under the same condition as `m_label` |
 
 ### `{drug_name}_frame_YY_mask.tiff`
@@ -114,17 +114,18 @@ A handful of example crops (up to 5 per reason, 100px half-width around the nucl
 
 ---
 
-## Day 0 and Lineage Classification
+## Day 0 and Cell Classification
 
-Most drug conditions image starting exactly at day 0 (the frame the drug is added on is frame 1). Some conditions instead image for a while *before* the drug is added - e.g. a 48-hours-before-treatment baseline, where imaging starts 2 days early and the drug isn't added until the 3rd frame. `clone_kmeans_id.mat`'s lineage classification (`cloneClassification`) is always computed starting from day 0, regardless of when imaging itself started - so for a condition like that, `cloneClassification` has no rows at all for the pre-treatment frames, and `config.DAY0_FRAMES[drug]` tells `append_labels.py` which frame day 0 actually falls on for that condition.
+Most drug conditions image starting exactly at day 0 (the frame the drug is added on is frame 1). Some conditions instead image for a while *before* the drug is added - e.g. a 48-hours-before-treatment baseline, where imaging starts 2 days early and the drug isn't added until the 3rd frame. `config.DAY0_FRAMES[drug]` tells `append_labels.py` which frame day 0 actually falls on for that condition.
 
-This matters because `cloneClassification` is **not** indexed by `lin_id` directly:
-- It has exactly one row per lineage that is still alive at or after day 0 - a lineage that dies out before day 0 has no row in it at all (not even a placeholder).
-- Row `i` (0-indexed) is the lineage with the `i`-th smallest `lin_id` *among lineages alive at or after day 0* - dead-before-day0 lineages are compacted out of the row numbering rather than leaving gaps. For example, if lineages 1 and 2 die before day 0 and lineages 3, 4, 5 survive to it, `cloneClassification` has exactly 3 rows: row 0 is lineage 3's label, row 1 is lineage 4's, row 2 is lineage 5's - **not** `lin_id - 1`.
-- A lineage that survives to day 0 gets its label applied to *all* of its rows, including any rows from before day 0 - the classification describes the whole lineage's fate, not just its post-day-0 frames.
-- A lineage that dies before day 0 gets `NaN` for both `m_label` and `k_label` on every one of its rows - this is the expected, normal state for a lineage with no fate classification, not an error.
+Classification (`clone_kmeans_id.mat`'s `cloneClassification`) is assigned per **cell present at day 0**, not per lineage. A lineage can already have divided multiple times during any pre-treatment imaging - e.g. 3 cells at frame 1 can expand to 100 cells by day 0 at frame 3 - and each of those 100 day-0 cells gets its *own* distinct label, independent of its siblings, even though all 100 share the same original lineage (`lin_id`). This matters: `cloneClassification` is **not** indexed by `lin_id` at all.
 
-For any condition where `DAY0_FRAMES[drug] == 1` (the drug is added on the very first imaged frame), every lineage is by definition "alive at or after frame 1", so this reduces exactly to the dense `lin_id -> row` mapping used when there's no pre-treatment baseline to account for.
+- `cloneClassification` has exactly one row per cell present at `frame == day0_frame`. Row `i` (0-indexed) is the day-0 cell with the `i`-th smallest `node_id`, in flat ascending order (not grouped by lineage).
+- Each day-0 cell's label is propagated forward to every one of its own descendants, via the `node_id`/`pred_node_id` parent-child chain - a descendant of a *different* day-0 sibling, even one sharing the same `lin_id`, gets that sibling's own (different) label instead.
+- A cell strictly before day 0 gets `NaN` for both `m_label` and `k_label` - its fate isn't classified until day 0, and a shared pre-day0 ancestor can fan out into several differently-labeled day-0 descendants, so no single label could correctly apply to it anyway.
+- A lineage that dies out before ever reaching day0_frame gets `NaN` throughout - no day-0 cell, no classification.
+
+For any condition where `DAY0_FRAMES[drug] == 1` (the drug is added on the very first imaged frame), frame 1 is the very start of imaging, so every lineage has exactly one cell there (no divisions have happened yet) - every cell is either a day-0 cell itself or a descendant of one, so no row ever ends up `NaN`.
 
 **Every key in `DRUG_DIRS` must have a matching entry in `DAY0_FRAMES`** - `main.py` asserts this up front and fails loudly if one's missing, since getting `day0_frame` wrong for a condition silently mis-pairs labels with cells rather than erroring in an obvious way.
 
