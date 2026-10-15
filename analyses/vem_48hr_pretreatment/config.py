@@ -25,7 +25,7 @@ COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 #  lineage_frame3_to_frame1.mat's track-local IDs into global lin_ids -
 #  see lineage_fate.py) and the two .mat files below, which live
 #  alongside the raw track tables, not in processed_data/.
-RAW_DRUG_DIR = '/path/to/vem_1uM_48hrsbefore/drug_dir'
+RAW_DRUG_DIR = '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM_48hrsbefore'
 
 #  lineage_table: file_idx, new_clone_id_global, old_clone_id_frame1 - see
 #  lineage_fate.py for exactly how these relate day-0 (frame 3) cells back

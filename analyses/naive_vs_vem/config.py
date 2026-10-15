@@ -46,7 +46,7 @@ def metadata_csv_path(condition: str) -> str:
 
 ###### Mask extraction / CAJAL parameters
 PAD_SIZE   = 200   # pixels of zero-padding added to each side of extracted masks
-N_JOBS     = 52    # parallel jobs for mask extraction / CAJAL - must match slurm_submit.sh's --cpus-per-task
+N_JOBS     = 64    # parallel jobs for mask extraction / CAJAL - must match slurm_submit.sh's --cpus-per-task
 N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 20    # clusters for quantized GW
 
