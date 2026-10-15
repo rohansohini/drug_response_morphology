@@ -9,6 +9,12 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from shared.classify import classify_subclass
 
+# the scheme itself now lives in each analysis's own config.py (not a
+# shared default) - these tests exercise classify_subclass() against the
+# same scheme every analysis currently uses
+DYING_M_LABEL, PERSISTING_M_LABEL, PROLIF_M_LABEL = 1, 2, 3
+SLOW_K_LABELS, FAST_K_LABELS = [1, 2], [3, 4, 5, 6]
+
 
 def test_all_eighteen_combined_labels_map_somewhere():
     rows = []
@@ -17,7 +23,7 @@ def test_all_eighteen_combined_labels_map_somewhere():
             rows.append({'m_label': m, 'k_label': k})
     df = pd.DataFrame(rows)
 
-    result = classify_subclass(df)
+    result = classify_subclass(df, DYING_M_LABEL, PERSISTING_M_LABEL, PROLIF_M_LABEL, SLOW_K_LABELS, FAST_K_LABELS)
     assert not result.isna().any()
 
     expected = {
@@ -36,7 +42,7 @@ def test_all_eighteen_combined_labels_map_somewhere():
 def test_unmapped_combination_raises():
     df = pd.DataFrame({'m_label': [4], 'k_label': [1]})  # m_label=4 doesn't exist
     try:
-        classify_subclass(df)
+        classify_subclass(df, DYING_M_LABEL, PERSISTING_M_LABEL, PROLIF_M_LABEL, SLOW_K_LABELS, FAST_K_LABELS)
     except ValueError as e:
         assert 'm_label' in str(e)
         print("PASS: an (m_label, k_label) combo outside the known scheme raises clearly, not silently")

@@ -66,7 +66,12 @@ def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame
 
         visible = df[df['has_mask'] & df['frame'].isin(overlapping_frames)].copy()
         visible['condition'] = condition
-        visible['subclass']  = classify_subclass(visible)
+        visible['subclass']  = classify_subclass(
+            visible,
+            dying_m_label=config.DYING_M_LABEL, persisting_m_label=config.PERSISTING_M_LABEL,
+            prolif_m_label=config.PROLIF_M_LABEL,
+            slow_k_labels=config.SLOW_K_LABELS, fast_k_labels=config.FAST_K_LABELS,
+        )
 
         bucket_sizes = visible.groupby(['frame', 'subclass']).size().to_dict()
         bucket_allocation = water_fill_allocate(bucket_sizes, condition_budget)

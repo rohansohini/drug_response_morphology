@@ -35,6 +35,20 @@ LINEAGE_MAT_PATH      = os.path.join(RAW_DRUG_DIR, 'lineage_frame3_to_frame1.mat
 #  reads; new_clone_id_global above is the 1-indexed row number into it.
 CLONE_KMEANS_MAT_PATH = os.path.join(RAW_DRUG_DIR, 'clone_kmeans_id.mat')
 
+###### Classification scheme (from process_imaging_data's cloneClassification)
+#  m_label: 1 = dying, 2 = persister, 3 = proliferator. Within m_label == 3,
+#  k_label splits slow (1, 2) vs fast (3, 4, 5, 6) proliferators. This
+#  mapping's biological basis (what the upstream k-means clusters actually
+#  represent) isn't derivable from this repo - confirm with whoever set up
+#  that clustering if you need to verify it. See shared/classify.py.
+#  Used by lineage_fate.py to classify each day-0 cell before rolling its
+#  subclass up into each frame-1 lineage's fate-mixture percentages.
+DYING_M_LABEL      = 1
+PERSISTING_M_LABEL = 2
+PROLIF_M_LABEL     = 3
+SLOW_K_LABELS      = [1, 2]
+FAST_K_LABELS      = [3, 4, 5, 6]
+
 OUTPUT_DIR       = 'output'
 MASKS_DIR        = os.path.join(OUTPUT_DIR, 'masks')
 CAJAL_OUTPUT_DIR = os.path.join(OUTPUT_DIR, 'cajal_output')

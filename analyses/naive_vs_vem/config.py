@@ -12,11 +12,21 @@ CONDITIONS      = [NAIVE_CONDITION, VEM_CONDITION]
 ###### Sampling
 #  Total cells selected for CAJAL, split across conditions by weight, then
 #  water-filled within each condition across its own (frame, subclass)
-#  buckets - see allocation.py and select_cells.py. The classification
-#  scheme itself (m_label/k_label -> subclass) is universal across every
-#  analysis in this repo, not specific to this one - see shared/classify.py.
+#  buckets - see allocation.py and select_cells.py.
 TOTAL_CELL_BUDGET = 30_000
 CONDITION_WEIGHTS = {NAIVE_CONDITION: 0.2, VEM_CONDITION: 0.8}   # must sum to 1.0
+
+###### Classification scheme (from process_imaging_data's cloneClassification)
+#  m_label: 1 = dying, 2 = persister, 3 = proliferator. Within m_label == 3,
+#  k_label splits slow (1, 2) vs fast (3, 4, 5, 6) proliferators. This
+#  mapping's biological basis (what the upstream k-means clusters actually
+#  represent) isn't derivable from this repo - confirm with whoever set up
+#  that clustering if you need to verify it. See shared/classify.py.
+DYING_M_LABEL      = 1
+PERSISTING_M_LABEL = 2
+PROLIF_M_LABEL     = 3
+SLOW_K_LABELS      = [1, 2]
+FAST_K_LABELS      = [3, 4, 5, 6]
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own

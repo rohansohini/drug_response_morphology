@@ -90,7 +90,12 @@ def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path
     class_data = pd.DataFrame(
         loadmat(clone_kmeans_mat_path)['cloneClassification'], columns=['m_label', 'k_label']
     )
-    class_data['subclass'] = classify_subclass(class_data)
+    class_data['subclass'] = classify_subclass(
+        class_data,
+        dying_m_label=config.DYING_M_LABEL, persisting_m_label=config.PERSISTING_M_LABEL,
+        prolif_m_label=config.PROLIF_M_LABEL,
+        slow_k_labels=config.SLOW_K_LABELS, fast_k_labels=config.FAST_K_LABELS,
+    )
 
     assert lineage_df['new_clone_id_global'].between(1, len(class_data)).all(), (
         f"lineage_table has new_clone_id_global value(s) outside [1, {len(class_data)}] "

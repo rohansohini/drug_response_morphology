@@ -40,7 +40,7 @@ drug_response_morphology/
 │   │   ├── extract_masks.py           # crops selected cells' masks
 │   │   ├── run_cajal.py               # CAJAL icdm + quantized GW distances
 │   │   └── embed.py                   # loads the distance matrix; UMAP on it
-│   ├── classify.py                    # m_label/k_label -> subclass (fixed scheme)
+│   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
 │   ├── load_data.py                   # merges UMAP coordinates / distance-matrix labels with metadata
 │   └── density_plots.py               # shared KDE-over-UMAP plotting (hard-label and weighted), PDF export
 ├── analyses/
@@ -142,7 +142,7 @@ Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `c
 
 ## Classification scheme
 
-Fixed and universal across every analysis (`shared/classify.py`), from `process_imaging_data`'s `cloneClassification`:
+`shared/classify.py`'s `classify_subclass()` maps `m_label`/`k_label` (from `process_imaging_data`'s `cloneClassification`) to a subclass - but the actual numeric scheme is declared explicitly in each analysis's own `config.py` (`DYING_M_LABEL`, `PERSISTING_M_LABEL`, `PROLIF_M_LABEL`, `SLOW_K_LABELS`, `FAST_K_LABELS`), not hardcoded in `shared/`. Every analysis currently uses the same values:
 
 | Subclass | Rule |
 |---|---|
@@ -150,6 +150,8 @@ Fixed and universal across every analysis (`shared/classify.py`), from `process_
 | `persisting` | `m_label == 2` |
 | `slow_prolif` | `m_label == 3` and `k_label` in {1, 2} |
 | `fast_prolif` | `m_label == 3` and `k_label` in {3, 4, 5, 6} |
+
+What the upstream k-means clusters (`k_label` 1-6) actually represent, and why 1-2 means "slow" vs. 3-6 "fast", isn't derivable from either this repo or `process_imaging_data` - that's domain knowledge from whoever set up the clustering.
 
 ---
 
