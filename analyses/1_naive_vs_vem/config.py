@@ -5,8 +5,8 @@ import os
 #  determines both the {condition}_metadata.csv filenames and the
 #  combined mask TIFF filenames) - confirmed against the real files:
 #  A2_naive_metadata.csv, A1_1uM_vem_metadata.csv.
-NAIVE_CONDITION = 'A2_naive'
-VEM_CONDITION   = 'A1_1uM_vem'
+NAIVE_CONDITION = 'naive'
+VEM_CONDITION   = 'vem_1uM'
 CONDITIONS      = [NAIVE_CONDITION, VEM_CONDITION]
 
 ###### Sampling
