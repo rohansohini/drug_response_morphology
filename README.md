@@ -16,11 +16,11 @@ Turns raw track/segmentation `.mat` data into the `{drug}_metadata.csv` and `com
 
 Each analysis is self-contained under `analyses/<name>/`, with its own README covering what it does and how its pieces fit together.
 
-### [`naive_vs_vem`](analyses/naive_vs_vem/README.md)
+### [`naive_vs_vem`](analyses/0_naive_vs_vem/README.md)
 
 Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` conditions over time, via a shared CAJAL/UMAP embedding sampled across both conditions.
 
-### [`vem_48hr_pretreatment`](analyses/vem_48hr_pretreatment/README.md)
+### [`vem_48hr_pretreatment`](analyses/1_vem_48hr_pretreatment/README.md)
 
 Asks whether a cell's shape *before* vemurafenib treatment relates to what it eventually becomes, by resolving each pre-treatment lineage's mixture of day-0 fates.
 
@@ -46,16 +46,16 @@ drug_response_morphology/
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
 │   └── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 ├── analyses/
-│   ├── naive_vs_vem/
+│   ├── 0_naive_vs_vem/
 │   │   ├── README.md
 │   │   ├── main.py                    # runs the pipeline end to end
 │   │   ├── config.py                  # conditions, sampling budget, paths
 │   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
-│   │   ├── notebooks/                 # the 3 notebooks (see analyses/naive_vs_vem/README.md)
+│   │   ├── notebooks/                 # the 3 notebooks (see analyses/0_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   └── vem_48hr_pretreatment/
+│   └── 1_vem_48hr_pretreatment/
 │       ├── README.md
 │       ├── main.py
 │       ├── config.py                  # dataset name, frames, paths
@@ -68,8 +68,8 @@ drug_response_morphology/
 │   ├── process_imaging_data/          # tests for process_imaging_data/
 │   ├── shared/                        # tests for shared/ - no real data needed
 │   └── analyses/
-│       ├── naive_vs_vem/
-│       └── vem_48hr_pretreatment/
+│       ├── 0_naive_vs_vem/
+│       └── 1_vem_48hr_pretreatment/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 

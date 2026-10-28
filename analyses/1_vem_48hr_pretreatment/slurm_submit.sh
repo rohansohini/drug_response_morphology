@@ -12,7 +12,7 @@
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/vem_48hr_pretreatment
+cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/1_vem_48hr_pretreatment
 conda activate drug_morpho
 
 mkdir -p logs

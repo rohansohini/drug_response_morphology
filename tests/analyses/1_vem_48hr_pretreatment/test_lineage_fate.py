@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/analyses/vem_48hr_pretreatment/test_lineage_fate.py
+Run directly: python3 tests/analyses/1_vem_48hr_pretreatment/test_lineage_fate.py
 '''
 import os
 import sys
@@ -9,7 +9,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'vem_48hr_pretreatment')
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '1_vem_48hr_pretreatment')
 sys.path.insert(0, ANALYSIS_DIR)
 import config
 
