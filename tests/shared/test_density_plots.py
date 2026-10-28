@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.density_plots import plot_umap_with_kde, export_kde_by_frame, plot_umap_with_weighted_kde
+from shared.density_plots import plot_embedding_with_kde, export_kde_by_frame, plot_embedding_with_weighted_kde
 
 
 def test_legend_shows_well_sampled_groups_only():
@@ -19,20 +19,21 @@ def test_legend_shows_well_sampled_groups_only():
     # attach a legend-visible label in this seaborn/matplotlib version
     # combo (confirmed directly: the resulting collection gets an
     # auto '_child0' label, which matplotlib's legend() ignores by
-    # convention) - plot_umap_with_kde must build the legend from manual
-    # proxy patches instead, or it silently renders with no legend at all.
+    # convention) - plot_embedding_with_kde must build the legend from
+    # manual proxy patches instead, or it silently renders with no legend
+    # at all.
     rng = np.random.default_rng(0)
     df = pd.DataFrame({
-        'umap_0': np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50), rng.normal(0, 1, 2)]),
-        'umap_1': np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50), rng.normal(0, 1, 2)]),
+        'dim_0': np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50), rng.normal(0, 1, 2)]),
+        'dim_1': np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50), rng.normal(0, 1, 2)]),
         'condition': ['naive'] * 50 + ['A1_1uM_vem'] * 50 + ['rare_group'] * 2,
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_kde(
+    plot_embedding_with_kde(
         df, 'condition',
         {'naive': 'tab:blue', 'A1_1uM_vem': 'tab:red', 'rare_group': 'tab:green'},
-        ax, 'test title', min_group_size=5,
+        ax, 'test title', 'UMAP', min_group_size=5,
     )
 
     legend = ax.get_legend()
@@ -69,11 +70,11 @@ def test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame(tmp_d
         for cond, offset in [('naive', 0), ('A1_1uM_vem', 5)]:
             for _ in range(10):
                 rows.append({'frame': frame, 'condition': cond,
-                             'umap_0': rng.normal(offset, 1), 'umap_1': rng.normal(offset, 1)})
+                             'dim_0': rng.normal(offset, 1), 'dim_1': rng.normal(offset, 1)})
     df = pd.DataFrame(rows)
 
     export_kde_by_frame(df, 'condition', {'naive': 'tab:blue', 'A1_1uM_vem': 'tab:red'},
-                         tmp_dir, 'cell')
+                         tmp_dir, 'cell', 'UMAP')
 
     pdf_dir = os.path.join(tmp_dir, 'pdfs')
     svg_dir = os.path.join(tmp_dir, 'svgs')
@@ -95,18 +96,18 @@ def test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame(tmp_d
 
 
 def test_kde_contours_are_unfilled_outlines_at_default_levels():
-    # regression test: plot_umap_with_kde must draw unfilled contour lines
-    # (fill=False) at exactly the default levels (0.7, 0.8, 0.9), not a
-    # filled density blob at 5 auto-spaced levels.
+    # regression test: plot_embedding_with_kde must draw unfilled contour
+    # lines (fill=False) at exactly the default levels (0.7, 0.8, 0.9),
+    # not a filled density blob at 5 auto-spaced levels.
     rng = np.random.default_rng(0)
     df = pd.DataFrame({
-        'umap_0': rng.normal(0, 1, 100),
-        'umap_1': rng.normal(0, 1, 100),
+        'dim_0': rng.normal(0, 1, 100),
+        'dim_1': rng.normal(0, 1, 100),
         'condition': ['naive'] * 100,
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title', min_group_size=5)
+    plot_embedding_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title', 'UMAP', min_group_size=5)
 
     # both fill=True and fill=False produce a QuadContourSet - get_fill()
     # is the actual signal for filled vs. outline-only, and len(.levels)
@@ -122,21 +123,21 @@ def test_kde_contours_are_unfilled_outlines_at_default_levels():
     print("PASS: KDE contours are drawn as unfilled outlines at exactly 3 levels")
 
 
-def test_plot_umap_with_kde_applies_explicit_xlim_ylim():
+def test_plot_embedding_with_kde_applies_explicit_xlim_ylim():
     rng = np.random.default_rng(0)
     df = pd.DataFrame({
-        'umap_0': rng.normal(0, 1, 50),
-        'umap_1': rng.normal(0, 1, 50),
+        'dim_0': rng.normal(0, 1, 50),
+        'dim_1': rng.normal(0, 1, 50),
         'condition': ['naive'] * 50,
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title',
-                        min_group_size=5, xlim=(-10, 10), ylim=(-20, 20))
+    plot_embedding_with_kde(df, 'condition', {'naive': 'tab:blue'}, ax, 'test title', 'UMAP',
+                             min_group_size=5, xlim=(-10, 10), ylim=(-20, 20))
 
     assert ax.get_xlim() == (-10, 10), f"expected xlim (-10, 10), got {ax.get_xlim()}"
     assert ax.get_ylim() == (-20, 20), f"expected ylim (-20, 20), got {ax.get_ylim()}"
-    print("PASS: plot_umap_with_kde applies explicit xlim/ylim when given")
+    print("PASS: plot_embedding_with_kde applies explicit xlim/ylim when given")
 
 
 def test_export_kde_by_frame_uses_identical_axes_across_frames():
@@ -151,7 +152,7 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
     for frame, scale in [(1, 1), (2, 3), (3, 10)]:
         for _ in range(30):
             rows.append({'frame': frame, 'condition': 'naive',
-                         'umap_0': rng.normal(0, scale), 'umap_1': rng.normal(0, scale)})
+                         'dim_0': rng.normal(0, scale), 'dim_1': rng.normal(0, scale)})
     df = pd.DataFrame(rows)
 
     import shutil
@@ -161,17 +162,17 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
 
     import shared.density_plots as dp
     seen_limits = {}
-    orig = dp.plot_umap_with_kde
+    orig = dp.plot_embedding_with_kde
 
-    def spy(df_arg, group_col, group_colors, ax, title, **kwargs):
+    def spy(df_arg, group_col, group_colors, ax, title, embedding_label, **kwargs):
         seen_limits[title] = (kwargs.get('xlim'), kwargs.get('ylim'))
-        return orig(df_arg, group_col, group_colors, ax, title, **kwargs)
+        return orig(df_arg, group_col, group_colors, ax, title, embedding_label, **kwargs)
 
-    dp.plot_umap_with_kde = spy
+    dp.plot_embedding_with_kde = spy
     try:
-        dp.export_kde_by_frame(df, 'condition', {'naive': 'tab:blue'}, tmp_dir, 'cell')
+        dp.export_kde_by_frame(df, 'condition', {'naive': 'tab:blue'}, tmp_dir, 'cell', 'UMAP')
     finally:
-        dp.plot_umap_with_kde = orig
+        dp.plot_embedding_with_kde = orig
 
     assert len(seen_limits) == 3, f"expected 3 frame calls, got {len(seen_limits)}"
     distinct_xlims = set(v[0] for v in seen_limits.values())
@@ -185,20 +186,20 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
 
 
 def test_weighted_kde_contours_are_unfilled_outlines_at_default_levels():
-    # regression test: plot_umap_with_weighted_kde must draw unfilled
+    # regression test: plot_embedding_with_weighted_kde must draw unfilled
     # contour lines (fill=False) at exactly the default levels
     # (0.5, 0.7, 0.9), matching the same outline-only convention as the
     # hard-label version.
     rng = np.random.default_rng(0)
     n = 100
     df = pd.DataFrame({
-        'umap_0': rng.normal(0, 1, n),
-        'umap_1': rng.normal(0, 1, n),
+        'dim_0': rng.normal(0, 1, n),
+        'dim_1': rng.normal(0, 1, n),
         'pct_dying': rng.uniform(0, 1, n),
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title')
+    plot_embedding_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title', 'UMAP')
 
     from matplotlib.contour import QuadContourSet
     contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
@@ -219,14 +220,14 @@ def test_weighted_kde_follows_the_weighted_region_not_just_point_density():
     rng = np.random.default_rng(0)
     n = 150
     pts = np.vstack([rng.normal([0, 0], 0.5, (n, 2)), rng.normal([20, 20], 0.5, (n, 2))])
-    df = pd.DataFrame({'umap_0': pts[:, 0], 'umap_1': pts[:, 1]})
+    df = pd.DataFrame({'dim_0': pts[:, 0], 'dim_1': pts[:, 1]})
     df['pct_dying']      = np.concatenate([np.full(n, 0.9), np.full(n, 0.1)])
     df['pct_persisting'] = 1 - df['pct_dying']
 
     fig, ax = plt.subplots()
-    plot_umap_with_weighted_kde(
+    plot_embedding_with_weighted_kde(
         df, {'dying': 'pct_dying', 'persisting': 'pct_persisting'},
-        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title',
+        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title', 'UMAP',
     )
 
     from matplotlib.contour import QuadContourSet
@@ -251,16 +252,16 @@ def test_weighted_kde_skips_a_group_below_min_total_weight():
     rng = np.random.default_rng(0)
     n = 50
     df = pd.DataFrame({
-        'umap_0': rng.normal(0, 1, n),
-        'umap_1': rng.normal(0, 1, n),
+        'dim_0': rng.normal(0, 1, n),
+        'dim_1': rng.normal(0, 1, n),
         'pct_dying':      np.full(n, 0.5),
         'pct_persisting': np.full(n, 0.01),  # total weight 0.5 - well below min_total_weight
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_weighted_kde(
+    plot_embedding_with_weighted_kde(
         df, {'dying': 'pct_dying', 'persisting': 'pct_persisting'},
-        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title', min_total_weight=5,
+        {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title', 'UMAP', min_total_weight=5,
     )
 
     legend = ax.get_legend()
@@ -275,13 +276,13 @@ def test_weighted_kde_legend_shows_total_weight():
     rng = np.random.default_rng(0)
     n = 40
     df = pd.DataFrame({
-        'umap_0': rng.normal(0, 1, n),
-        'umap_1': rng.normal(0, 1, n),
+        'dim_0': rng.normal(0, 1, n),
+        'dim_1': rng.normal(0, 1, n),
         'pct_dying': np.full(n, 0.8),
     })
 
     fig, ax = plt.subplots()
-    plot_umap_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title')
+    plot_embedding_with_weighted_kde(df, {'dying': 'pct_dying'}, {'dying': 'tab:red'}, ax, 'test title', 'UMAP')
 
     legend = ax.get_legend()
     labels = [t.get_text() for t in legend.get_texts()]
@@ -295,7 +296,7 @@ if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
-    test_plot_umap_with_kde_applies_explicit_xlim_ylim()
+    test_plot_embedding_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()
     test_weighted_kde_contours_are_unfilled_outlines_at_default_levels()
     test_weighted_kde_follows_the_weighted_region_not_just_point_density()

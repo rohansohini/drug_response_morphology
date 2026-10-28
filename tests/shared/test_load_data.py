@@ -34,9 +34,9 @@ def test_build_dataset_merges_correctly():
     assert len(df) == 2
     naive_row = df[df['condition'] == 'naive'].iloc[0]
     assert naive_row['subclass'] == 'fast_prolif'
-    assert np.isclose(naive_row['umap_0'], 0.1)
+    assert np.isclose(naive_row['dim_0'], 0.1)
 
-    print("PASS: build_dataset merges UMAP coordinates with metadata correctly")
+    print("PASS: build_dataset merges embedding coordinates with metadata correctly, into generic dim_0/dim_1 columns")
 
 
 def test_build_dataset_raises_on_unmatched_cell():

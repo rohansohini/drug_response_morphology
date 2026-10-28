@@ -83,34 +83,43 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
 
 def build_dataset(labels: list[str], embedding: np.ndarray, selected: pd.DataFrame) -> pd.DataFrame:
     '''
-    Merge UMAP coordinates with the selected-cell metadata. Thin wrapper
-    around match_labels_to_metadata() that additionally attaches the
-    embedding coordinates, for callers (notebook plotting) that need them.
+    Merge 2D embedding coordinates with the selected-cell metadata. Thin
+    wrapper around match_labels_to_metadata() that additionally attaches
+    the embedding coordinates, for callers (notebook plotting) that need
+    them. Works identically regardless of which method (UMAP, PHATE, ...)
+    produced `embedding` - the columns are always named dim_0/dim_1,
+    never e.g. umap_0/umap_1, so notebook/plotting code never needs to
+    know or care which method was used.
 
     Inputs:
-        labels:    from shared.cajal.embed.get_umap_embedding
-        embedding: (n, 2) UMAP coordinates, same row order as labels
+        labels:    from shared.cajal.embed.get_umap_embedding or
+                   get_phate_embedding
+        embedding: (n, 2) coordinates, same row order as labels
         selected:  see match_labels_to_metadata
     Outputs:
-        df: from match_labels_to_metadata, plus umap_0/umap_1 columns
+        df: from match_labels_to_metadata, plus dim_0/dim_1 columns
     '''
     df = match_labels_to_metadata(labels, selected)
-    df['umap_0'] = embedding[:, 0]
-    df['umap_1'] = embedding[:, 1]
+    df['dim_0'] = embedding[:, 0]
+    df['dim_1'] = embedding[:, 1]
     return df
 
 
-def load_full_dataset(cajal_output_dir: str, modality: str, metadata_filename: str = 'selected_metadata.csv') -> pd.DataFrame:
+def load_full_dataset(cajal_output_dir: str, modality: str, embedding_method: str,
+                       metadata_filename: str = 'selected_metadata.csv') -> pd.DataFrame:
     '''
-    Load the selected-cell metadata and the UMAP embedding for one
-    modality from disk, merged into one DataFrame. Thin I/O wrapper
-    around build_dataset for notebook use.
+    Load the selected-cell metadata and one embedding method's 2D
+    coordinates for one modality from disk, merged into one DataFrame.
+    Thin I/O wrapper around build_dataset for notebook use.
 
     Inputs:
         cajal_output_dir:  directory containing {metadata_filename} and
-                           {modality}_umap.npz - an analysis's own
-                           config.CAJAL_OUTPUT_DIR
+                           {modality}_{embedding_method}.npz - an
+                           analysis's own config.CAJAL_OUTPUT_DIR
+                           (main.py's Step 4 saves both 'umap' and
+                           'phate' for every modality)
         modality:          'cell' or 'nuc'
+        embedding_method:  'umap' or 'phate' - which saved embedding to load
         metadata_filename: filename of the selected-cell metadata CSV
                            within cajal_output_dir
     Outputs:
@@ -119,7 +128,7 @@ def load_full_dataset(cajal_output_dir: str, modality: str, metadata_filename: s
     selected_path = os.path.join(cajal_output_dir, metadata_filename)
     selected = pd.read_csv(selected_path)
 
-    umap_path = os.path.join(cajal_output_dir, f'{modality}_umap.npz')
-    data = np.load(umap_path, allow_pickle=True)
+    embedding_path = os.path.join(cajal_output_dir, f'{modality}_{embedding_method}.npz')
+    data = np.load(embedding_path, allow_pickle=True)
 
     return build_dataset(list(data['labels']), data['embedding'], selected)
