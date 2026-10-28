@@ -16,6 +16,17 @@ from joblib import Parallel, delayed
 #  - saved to out_dir/cell/ and out_dir/nuc/
 
 
+def extracted_mask_paths(drug: str, frame: int, out_dir: str) -> tuple[str, str]:
+    '''
+    Where extract_frame_masks writes (or has already written) a given
+    frame's extracted cell/nuc masks - shared with extract_masks' own
+    skip-if-exists check so the two can't drift apart.
+    '''
+    cell_path = os.path.join(out_dir, 'cell', f"{drug}_frame_{str(frame).zfill(2)}_cell_mask_sampled.tiff")
+    nuc_path  = os.path.join(out_dir, 'nuc',  f"{drug}_frame_{str(frame).zfill(2)}_nuc_mask_sampled.tiff")
+    return cell_path, nuc_path
+
+
 def extract_frame_masks(
     drug: str,
     frame: int,
@@ -55,12 +66,7 @@ def extract_frame_masks(
     cell_mask = np.pad(cell_mask, pad_width=pad_size, mode='constant', constant_values=0)
     nuc_mask  = np.pad(nuc_mask,  pad_width=pad_size, mode='constant', constant_values=0)
 
-    cell_dir = os.path.join(out_dir, 'cell')
-    nuc_dir  = os.path.join(out_dir, 'nuc')
-
-    cell_path = os.path.join(cell_dir, f"{drug}_frame_{str(frame).zfill(2)}_cell_mask_sampled.tiff")
-    nuc_path  = os.path.join(nuc_dir,  f"{drug}_frame_{str(frame).zfill(2)}_nuc_mask_sampled.tiff")
-
+    cell_path, nuc_path = extracted_mask_paths(drug, frame, out_dir)
     tifffile.imwrite(cell_path, cell_mask)
     tifffile.imwrite(nuc_path, nuc_mask)
 
@@ -89,11 +95,23 @@ def extract_masks(
 
     frames = sorted(df['frame'].unique())
 
+    # skip any frame whose extracted masks are already on disk - same
+    # exists-check pattern as run_cajal/get_umap_embedding/get_phate_embedding,
+    # so a rerun that's only after a new downstream step (e.g. PHATE) doesn't
+    # redo this frame-by-frame mask work for nothing
+    frames_to_extract = [
+        frame for frame in frames
+        if not all(os.path.exists(p) for p in extracted_mask_paths(drug, frame, out_dir))
+    ]
+    n_skipped = len(frames) - len(frames_to_extract)
+    if n_skipped:
+        print(f"  Skipping {n_skipped}/{len(frames)} frame(s) ({drug}): already extracted")
+
     Parallel(n_jobs=n_jobs)(
         delayed(extract_frame_masks)(
             drug, frame,
             set(df[(df['frame'] == frame) & (df['sampled'])]['pixel_id'].values),
             combined_masks_dir, out_dir, pad_size
         )
-        for frame in tqdm(frames, desc=f'  Extracting masks ({drug})')
+        for frame in tqdm(frames_to_extract, desc=f'  Extracting masks ({drug})')
     )
