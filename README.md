@@ -151,7 +151,7 @@ python main.py
 
 **Step 2 - the analysis notebooks:**
 
-Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv`, `cell_umap.npz`, and `nuc_umap.npz` all exist under that analysis's own `output/`), open the notebooks in `analyses/<name>/notebooks/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot.
+Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv` and each modality's `_umap.npz`/`_phate.npz` embeddings all exist under that analysis's own `output/`), open the notebooks in `analyses/<name>/notebooks/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot.
 
 ---
 

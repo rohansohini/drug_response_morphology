@@ -50,6 +50,7 @@ N_JOBS     = 64    # parallel jobs for mask extraction / CAJAL - must match slur
 N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 20    # clusters for quantized GW
 
-###### UMAP parameters
-#  Fit directly on the CAJAL GW distance matrix (metric='precomputed').
-UMAP_SEED = 42
+###### Embedding parameters
+#  Both fit directly on the CAJAL GW distance matrix (precomputed).
+UMAP_SEED  = 42
+PHATE_SEED = 42

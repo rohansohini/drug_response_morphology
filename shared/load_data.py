@@ -30,8 +30,8 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
     the wrong representation for anything quantitative).
 
     Inputs:
-        labels:   from shared.cajal.embed.get_umap_embedding or
-                  load_distance_matrix
+        labels:   from shared.cajal.embed.get_umap_embedding,
+                  get_phate_embedding, or load_distance_matrix
         selected: an analysis's own selected-cell DataFrame (e.g. from
                   naive_vs_vem's select_cells.select_cells, or
                   vem_48hr_pretreatment's load_all_cells.load_all_cells)

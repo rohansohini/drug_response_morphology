@@ -19,7 +19,7 @@ import config
 from load_all_cells import load_all_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal
-from shared.cajal.embed import get_umap_embedding
+from shared.cajal.embed import get_umap_embedding, get_phate_embedding
 
 # config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
 # which Python resolves against the current working directory at runtime,
@@ -94,12 +94,16 @@ def main():
 
         Parallel(n_jobs=n_tasks)(tasks)
 
-    # --- step 4: fit UMAP directly on the CAJAL distances ---
-    print("\n[4/4] Fitting UMAP embeddings...")
-    cell_umap_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_umap.npz')
-    nuc_umap_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_umap.npz')
+    # --- step 4: fit UMAP and PHATE directly on the CAJAL distances ---
+    print("\n[4/4] Fitting embeddings...")
+    cell_umap_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_umap.npz')
+    nuc_umap_path   = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_umap.npz')
+    cell_phate_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_phate.npz')
+    nuc_phate_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_phate.npz')
     get_umap_embedding(cell_dist_csv, cell_umap_path, seed=config.UMAP_SEED)
     get_umap_embedding(nuc_dist_csv, nuc_umap_path, seed=config.UMAP_SEED)
+    get_phate_embedding(cell_dist_csv, cell_phate_path, seed=config.PHATE_SEED)
+    get_phate_embedding(nuc_dist_csv, nuc_phate_path, seed=config.PHATE_SEED)
 
     print("\nDone.")
 

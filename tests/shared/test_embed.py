@@ -17,7 +17,7 @@ _fake_cajal.utilities = types.ModuleType('cajal.utilities')
 sys.modules['cajal'] = _fake_cajal
 sys.modules['cajal.utilities'] = _fake_cajal.utilities
 
-from shared.cajal.embed import reformat_name, get_umap_embedding
+from shared.cajal.embed import reformat_name, get_umap_embedding, get_phate_embedding
 import shared.cajal.embed as embed_module
 
 
@@ -104,8 +104,75 @@ def test_get_umap_embedding_fits_umap_on_precomputed_distances(tmp_path='/tmp/cl
     print("PASS: get_umap_embedding fits UMAP on a precomputed distance matrix and preserves cluster separation")
 
 
+def test_get_phate_embedding_skips_if_output_exists(tmp_path='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/embed_test_phate'):
+    os.makedirs(tmp_path, exist_ok=True)
+    out_path = os.path.join(tmp_path, 'fake_phate.npz')
+
+    fake_labels = np.array(['naive_frame_01_pixel_1', 'A1_1uM_vem_frame_01_pixel_2'])
+    fake_embedding = np.array([[0.1, 0.2], [0.3, 0.4]])
+    np.savez(out_path, labels=fake_labels, embedding=fake_embedding)
+
+    # dist_csv doesn't even need to exist - if skip-if-exists works, it's never read
+    labels, embedding = get_phate_embedding('/nonexistent/path.csv', out_path, seed=42)
+
+    assert list(labels) == list(fake_labels)
+    assert np.allclose(embedding, fake_embedding)
+
+    print("PASS: get_phate_embedding skips recomputation and reloads existing output correctly")
+
+
+def test_get_phate_embedding_fits_phate_on_precomputed_distances(tmp_path='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/embed_test_phate2'):
+    os.makedirs(tmp_path, exist_ok=True)
+    out_path = os.path.join(tmp_path, 'phate.npz')
+    if os.path.exists(out_path):
+        os.remove(out_path)
+
+    # same synthetic two-cluster setup as the UMAP test above
+    rng = np.random.default_rng(0)
+    n = 40
+    names = (
+        [f'A1_1uM_vem_frame_01_cell_mask_sampled_{i}' for i in range(n // 2)] +
+        [f'naive_frame_01_cell_mask_sampled_{i}' for i in range(n // 2, n)]
+    )
+    points = np.vstack([
+        rng.normal(loc=[0, 0], scale=0.3, size=(n // 2, 2)),
+        rng.normal(loc=[10, 10], scale=0.3, size=(n // 2, 2)),
+    ])
+    dist_matrix = np.linalg.norm(points[:, None, :] - points[None, :, :], axis=-1)
+    dist_dict = {(names[i], names[j]): dist_matrix[i, j] for i in range(n) for j in range(n) if i != j}
+
+    class FakeUtilities:
+        @staticmethod
+        def read_gw_dists(path, header=True):
+            return names, dist_dict
+        @staticmethod
+        def dist_mat_of_dict(d, names_):
+            return dist_matrix
+
+    original_utilities = embed_module.cajal.utilities
+    embed_module.cajal.utilities = FakeUtilities()
+    try:
+        labels, embedding = get_phate_embedding('/fake/dist.csv', out_path, seed=42)
+    finally:
+        embed_module.cajal.utilities = original_utilities
+
+    assert len(labels) == n
+    assert embedding.shape == (n, 2)
+    assert os.path.exists(out_path)
+    # the two well-separated input clusters should still be separated in the PHATE output
+    from scipy.spatial.distance import pdist, squareform
+    phate_dist = squareform(pdist(embedding))
+    within_a  = phate_dist[:n//2, :n//2][np.triu_indices(n//2, k=1)].mean()
+    between   = phate_dist[:n//2, n//2:].mean()
+    assert between > within_a, "expected the two input clusters to remain separated in the PHATE embedding"
+
+    print("PASS: get_phate_embedding fits PHATE on a precomputed distance matrix and preserves cluster separation")
+
+
 if __name__ == '__main__':
     test_reformat_name_handles_underscores_in_condition_name()
     test_get_umap_embedding_skips_if_output_exists()
     test_get_umap_embedding_fits_umap_on_precomputed_distances()
+    test_get_phate_embedding_skips_if_output_exists()
+    test_get_phate_embedding_fits_phate_on_precomputed_distances()
     print("\nAll tests passed.")
