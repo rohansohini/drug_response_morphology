@@ -24,7 +24,7 @@ from shared.cajal.embed import get_umap_embedding, get_phate_embedding
 # config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
 # which Python resolves against the current working directory at runtime,
 # not this script's own location - if main.py is ever invoked as
-# `python analyses/1_vem_48hr_pretreatment/main.py` from somewhere else
+# `python analyses/2_vem_48hr_pretreatment/main.py` from somewhere else
 # (e.g. the repo root) rather than `cd`-ing into this directory first,
 # those paths would silently resolve under the WRONG directory, including
 # possibly colliding with another analysis's output. Re-anchor them to

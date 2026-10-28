@@ -16,11 +16,11 @@ Turns raw track/segmentation `.mat` data (under `raw_data/`) into the `{drug}_me
 
 Each analysis is self-contained under `analyses/<name>/`, with its own README covering what it does and how its pieces fit together.
 
-### [`naive_vs_vem`](analyses/0_naive_vs_vem/README.md)
+### [`naive_vs_vem`](analyses/1_naive_vs_vem/README.md)
 
 Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` conditions over time, via a shared CAJAL/UMAP embedding sampled across both conditions.
 
-### [`vem_48hr_pretreatment`](analyses/1_vem_48hr_pretreatment/README.md)
+### [`vem_48hr_pretreatment`](analyses/2_vem_48hr_pretreatment/README.md)
 
 Asks whether a cell's shape *before* vemurafenib treatment relates to what it eventually becomes, by resolving each pre-treatment lineage's mixture of day-0 fates.
 
@@ -47,16 +47,16 @@ drug_response_morphology/
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
 │   └── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 ├── analyses/
-│   ├── 0_naive_vs_vem/
+│   ├── 1_naive_vs_vem/
 │   │   ├── README.md
 │   │   ├── main.py                    # runs the pipeline end to end
 │   │   ├── config.py                  # conditions, sampling budget, paths
 │   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
-│   │   ├── notebooks/                 # the 3 notebooks (see analyses/0_naive_vs_vem/README.md)
+│   │   ├── notebooks/                 # the 3 notebooks (see analyses/1_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   └── 1_vem_48hr_pretreatment/
+│   └── 2_vem_48hr_pretreatment/
 │       ├── README.md
 │       ├── main.py
 │       ├── config.py                  # dataset name, frames, paths
@@ -69,8 +69,8 @@ drug_response_morphology/
 │   ├── process_imaging_data/          # tests for process_imaging_data/
 │   ├── shared/                        # tests for shared/ - no real data needed
 │   └── analyses/
-│       ├── 0_naive_vs_vem/
-│       └── 1_vem_48hr_pretreatment/
+│       ├── 1_naive_vs_vem/
+│       └── 2_vem_48hr_pretreatment/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 
@@ -90,7 +90,7 @@ output/
 
 1. `mkdir -p analyses/<name>/notebooks`
 2. Write `analyses/<name>/config.py` - at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions/frames/sampling).
-3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `0_naive_vs_vem/select_cells.py` for budget-based sampling, or `1_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
+3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `1_naive_vs_vem/select_cells.py` for budget-based sampling, or `2_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
 4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom) - copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each under its own subfolder (see any existing notebook's cell 3) - follow that same pattern rather than picking just one.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
 6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together - see any existing analysis's README for the expected level of detail.

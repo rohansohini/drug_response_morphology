@@ -1,10 +1,10 @@
 '''
-Run directly: python3 tests/analyses/0_naive_vs_vem/test_allocation.py
+Run directly: python3 tests/analyses/1_naive_vs_vem/test_allocation.py
 '''
 import os
 import sys
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '0_naive_vs_vem')
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '1_naive_vs_vem')
 sys.path.insert(0, ANALYSIS_DIR)
 from allocation import water_fill_allocate
 
