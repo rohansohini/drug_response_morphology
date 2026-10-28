@@ -5,7 +5,7 @@ parsed from the .mat filename. The filename's own embedded number is known
 to be unreliable, so loadmat() is mocked here with deliberately misleading
 filenames to prove the track column reflects the dict key, not the path.
 
-Run directly: python3 tests/test_raw_data_track_numbering.py
+Run directly: python3 tests/analyses/process_imaging_data/test_raw_data_track_numbering.py
 '''
 import os
 import sys
@@ -13,7 +13,8 @@ from unittest.mock import patch
 
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'process_imaging_data')
+sys.path.insert(0, ANALYSIS_DIR)
 from pipeline.track_table import load_track_table
 from pipeline.load_nuclear_data import load_nuclear_data
 

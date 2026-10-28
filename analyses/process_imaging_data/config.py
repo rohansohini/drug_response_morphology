@@ -11,11 +11,11 @@ import os
 ##############################################################
 
 DRUG_DIRS = {
-    'naive':   '/projects/b1042/GoyalLab/sohini/raw_data/naive',
-    'vem_1uM': '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM',
-    'vem_48hrsbefore': '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM_48hrsbefore',
-    'gem_2.5nM': '/projects/b1042/GoyalLab/sohini/raw_data/gem_2.5nM',
-    'tram_6nM': '/projects/b1042/GoyalLab/sohini/raw_data/tram_6nM'
+    'naive':   '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/naive',
+    'vem_1uM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM',
+    'vem_48hrsbefore': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_48hrsbefore',
+    'gem_2.5nM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/gem_2.5nM',
+    'tram_6nM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/tram_6nM'
 }
 
 ##############################################################

@@ -8,26 +8,19 @@ This repo holds multiple, independent analyses, each self-contained under `analy
 
 ## Analyses
 
-### `naive_vs_vem`
+Each analysis is self-contained under `analyses/<name>/`, with its own README covering what it does and how its pieces fit together.
 
-Compares cell and nuclear morphology between `naive` and `A1_1uM_vem` conditions over time.
+### [`naive_vs_vem`](analyses/naive_vs_vem/README.md)
 
-1. **Selects cells** for CAJAL from both conditions, every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and sampled with an 80/20 vem/naive budget split (`select_cells.py` / `allocation.py`).
-2. **Runs CAJAL** once per modality (cell, nucleus) on the combined selection.
-3. **Fits UMAP directly on the CAJAL distance matrix** (`metric='precomputed'`).
-4. **Three notebooks** read that one shared embedding and plot different comparisons:
-   - `01_umap_by_condition_over_time.ipynb` - every cell, every subclass, KDE per condition
-   - `02_proliferators_vem_vs_naive.ipynb` - proliferators only (`m_label == 3`), KDE per condition
-   - `03_vem_subclasses_over_time.ipynb` - vem only, KDE per subclass
+Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` conditions over time, via a shared CAJAL/UMAP embedding sampled across both conditions.
 
-### `vem_48hr_pretreatment`
+### [`vem_48hr_pretreatment`](analyses/vem_48hr_pretreatment/README.md)
 
-For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug addition), frame 3 is day 0 (when 1µM vemurafenib was added). This analysis only ever looks at **frame 1** (`config.FRAMES = [1]`) - `process_imaging_data` doesn't classify a cell until day 0, so a frame-1 cell has no single subclass to compare across frames; the question here is whether a cell's shape *before* treatment relates to what it eventually becomes.
+Asks whether a cell's shape *before* vemurafenib treatment relates to what it eventually becomes, by resolving each pre-treatment lineage's mixture of day-0 fates.
 
-1. **Uses every available frame-1 cell/nucleus** - no sampling budget, unlike `naive_vs_vem` (`load_all_cells.py`).
-2. **Runs CAJAL** once per modality on frame-1 cells, then fits UMAP directly on that distance matrix.
-3. **Resolves each frame-1 lineage's eventual fate mixture** (`lineage_fate.py`): a frame-1 lineage can already have divided by day 0 (e.g. 3 cells at frame 1 expanding to 100 by day 0), and each of those day-0 descendants can land in a *different* subclass - so instead of one hard label, each frame-1 cell gets `%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, resolved from `lineage_frame3_to_frame1.mat` and `clone_kmeans_id.mat` (raw, track-local lineage IDs resolved to this analysis's own `lin_id` by reusing `process_imaging_data`'s `load_track`/`make_master_ids` directly).
-4. **`01_frame1_fate_mixture.ipynb`** plots that mixture as a weighted KDE per fate category over the frame-1 UMAP - every cell contributes to every category's contour in proportion to its own percentage in that category, rather than being forced into one dominant-fate bucket (`shared/density_plots.py`'s `plot_umap_with_weighted_kde`).
+### [`process_imaging_data`](analyses/process_imaging_data/README.md)
+
+Turns raw track/segmentation `.mat` data into the `{drug}_metadata.csv` and `combined_masks/` that both analyses above read as their input.
 
 ---
 
@@ -35,9 +28,6 @@ For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug a
 
 ```
 drug_response_morphology/
-├── process_imaging_data/              # nested standalone pipeline (own repo history, own environment.yml/tests) -
-│                                       #   turns raw track tables into {drug}_metadata.csv + combined_masks/;
-│                                       #   see process_imaging_data/README.md for its own structure
 ├── shared/                            # reusable across every analysis
 │   ├── cajal/
 │   │   ├── extract_masks.py           # crops selected cells' masks
@@ -48,26 +38,36 @@ drug_response_morphology/
 │   └── density_plots.py               # shared KDE-over-UMAP plotting (hard-label and weighted), PDF export
 ├── analyses/
 │   ├── naive_vs_vem/
+│   │   ├── README.md
 │   │   ├── main.py                    # runs the pipeline end to end
 │   │   ├── config.py                  # conditions, sampling budget, paths
 │   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
-│   │   ├── notebooks/                 # the 3 notebooks (see above)
+│   │   ├── notebooks/                 # the 3 notebooks (see analyses/naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   └── vem_48hr_pretreatment/
+│   ├── vem_48hr_pretreatment/
+│   │   ├── README.md
+│   │   ├── main.py
+│   │   ├── config.py                  # dataset name, frames, paths
+│   │   ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
+│   │   ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored)
+│   └── process_imaging_data/
+│       ├── README.md                  # raw data format, pipeline steps, output columns, classification logic
 │       ├── main.py
-│       ├── config.py                  # dataset name, frames, paths
-│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
-│       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
+│       ├── config.py                  # drug conditions, raw data paths, day-0 frames
+│       ├── pipeline/
 │       ├── slurm_submit.sh
-│       ├── notebooks/
-│       └── output/                    # generated (gitignored)
+│       └── processed_data/            # generated (gitignored)
 ├── tests/
 │   ├── shared/                        # tests for shared/ - no real data needed
 │   └── analyses/
 │       ├── naive_vs_vem/
-│       └── vem_48hr_pretreatment/
+│       ├── vem_48hr_pretreatment/
+│       └── process_imaging_data/
 └── environment.yml                    # shared across every analysis
 ```
 
@@ -90,6 +90,7 @@ output/
 3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `naive_vs_vem/select_cells.py` for budget-based sampling, or `vem_48hr_pretreatment/load_all_cells.py` for "use everything").
 4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_umap_with_kde` directly for something custom) - copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
+6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together - see any existing analysis's README for the expected level of detail.
 
 Anything genuinely reusable across analyses (not just this one) belongs in `shared/`, not copied into the new analysis folder.
 
@@ -97,8 +98,8 @@ Anything genuinely reusable across analyses (not just this one) belongs in `shar
 
 ## Prerequisites
 
-- `process_imaging_data/` (nested in this repo - see below) has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/`.
-- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that directory's location (`/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data`).
+- The `process_imaging_data` analysis has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/` (see [`analyses/process_imaging_data/README.md`](analyses/process_imaging_data/README.md)).
+- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that directory's location (`/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/process_imaging_data`).
 
 ---
 
@@ -106,19 +107,28 @@ Anything genuinely reusable across analyses (not just this one) belongs in `shar
 
 ```bash
 conda env create -f environment.yml
-conda activate drug_response_morphology
+conda activate drug_morpho
 ```
 
 If `mamba` is available (`mamba --version`), use it instead - it's a drop-in replacement that reads this same `environment.yml` but resolves dependencies much faster:
 
 ```bash
 mamba env create -f environment.yml
-conda activate drug_response_morphology
+conda activate drug_morpho
 ```
 
-One environment is shared across every analysis (`naive_vs_vem` and `vem_48hr_pretreatment`).
+One environment (`drug_morpho`) is shared across every analysis.
 
-`process_imaging_data/` is a separate, self-contained sub-project with its own `environment.yml` (MATLAB `.mat` parsing, segmentation mask building - a different dependency set than CAJAL/UMAP) - set it up separately per `process_imaging_data/README.md` before running anything there.
+### Using this environment in a Jupyter notebook on Quest
+
+Creating the environment above doesn't make it selectable in Quest's OnDemand Jupyter Notebook/JupyterLab interactive sessions - it has to be registered as a kernel once, with the environment activated:
+
+```bash
+conda activate drug_morpho
+python -m ipykernel install --user --name drug_morpho --display-name "Python (drug_morpho)"
+```
+
+After that, `Python (drug_morpho)` appears as a selectable kernel in any new Quest OnDemand Jupyter session - no need to re-register it unless the environment is recreated from scratch.
 
 ---
 

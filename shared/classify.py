@@ -9,7 +9,7 @@ def classify_subclass(df: pd.DataFrame, dying_m_label: int, persisting_m_label: 
     'fast_prolif', from its m_label/k_label.
 
     The m_label/k_label -> subclass mapping comes from process_imaging_data's
-    cloneClassification (see process_imaging_data/README.md), but the
+    cloneClassification (see analyses/process_imaging_data/README.md), but the
     specific numeric scheme (which m_label means 'dying', which k_labels
     are 'slow' vs 'fast') is domain knowledge about the upstream k-means
     clustering that isn't derivable from this repo - each analysis

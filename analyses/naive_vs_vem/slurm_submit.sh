@@ -13,7 +13,7 @@ module purge
 eval "$(conda shell.bash hook)"
 
 cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/naive_vs_vem
-conda activate drug_response_morphology
+conda activate drug_morpho
 
 mkdir -p logs
 python main.py

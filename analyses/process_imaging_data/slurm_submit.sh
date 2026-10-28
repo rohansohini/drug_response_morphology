@@ -11,8 +11,8 @@
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data/
-conda activate process_imaging
+cd /projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/process_imaging_data/
+conda activate drug_morpho
 
 mkdir -p logs
 python main.py

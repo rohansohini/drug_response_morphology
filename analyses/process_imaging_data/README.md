@@ -9,11 +9,10 @@ By Rohan Sohini with help from Claude Sonnet 4.6 Medium
 ## Directory Structure
 
 ```
-process_imaging_data/
+analyses/process_imaging_data/
 ├── main.py
 ├── config.py
 ├── slurm_submit.sh
-├── environment.yml
 ├── processed_data/
 │   ├── {drug_name}_metadata.csv
 │   ├── combined_masks/
@@ -175,12 +174,7 @@ Raw data is read directly from each path in `DRUG_DIRS` - nothing is copied into
 
 ## Setup
 
-All dependencies are defined in `environment.yml`. Create the environment once before running:
-
-```bash
-mamba env create -f environment.yml
-conda activate process_imaging
-```
+Dependencies are defined in the repo's shared `environment.yml` - see the root README's "Setup" section to create and activate it before running anything here.
 
 ---
 
@@ -189,23 +183,15 @@ conda activate process_imaging
 ### Locally
 
 ```bash
-conda activate process_imaging
-cd process_imaging_data
+conda activate drug_morpho
+cd analyses/process_imaging_data
 python main.py
 ```
 
 ### On Quest (HPC)
 
-Make sure the environment is created first (one-time setup):
-
 ```bash
-mamba env create -f environment.yml
-```
-
-Then submit the job:
-
-```bash
-cd /{YOUR_PATH}/process_imaging_data
+cd /{YOUR_PATH}/analyses/process_imaging_data
 sbatch slurm_submit.sh
 ```
 

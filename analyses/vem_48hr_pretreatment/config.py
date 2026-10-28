@@ -14,9 +14,8 @@ FRAMES = [1]
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own
-#  processed_data/ - no copy step. It now lives nested inside this repo
-#  (process_imaging_data/), rather than as a separate standalone checkout.
-PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data'
+#  processed_data/ - no copy step.
+PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/process_imaging_data'
 PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_data')
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
@@ -26,7 +25,7 @@ COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 #  lineage_frame3_to_frame1.mat's track-local IDs into global lin_ids -
 #  see lineage_fate.py) and the two .mat files below, which live
 #  alongside the raw track tables, not in processed_data/.
-RAW_DRUG_DIR = '/projects/b1042/GoyalLab/sohini/raw_data/vem_1uM_48hrsbefore'
+RAW_DRUG_DIR = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_48hrsbefore'
 
 #  lineage_table: file_idx, new_clone_id_global, old_clone_id_frame1 - see
 #  lineage_fate.py for exactly how these relate day-0 (frame 3) cells back

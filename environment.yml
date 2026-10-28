@@ -1,4 +1,4 @@
-name: drug_response_morphology
+name: drug_morpho
 channels:
   - conda-forge
   - defaults
@@ -10,6 +10,8 @@ dependencies:
   - matplotlib
   - seaborn
   - tifffile
+  - scikit-image
+  - pillow
   - joblib
   - tqdm
   - ipykernel
