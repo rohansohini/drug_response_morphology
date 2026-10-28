@@ -14,8 +14,9 @@ FRAMES = [1]
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own
-#  processed_data/ - no copy step. Point this at wherever that repo lives.
-PROCESS_IMAGING_DATA_ROOT = '/gpfs/projects/b1042/GoyalLab/sohini/process_imaging_data'
+#  processed_data/ - no copy step. It now lives nested inside this repo
+#  (process_imaging_data/), rather than as a separate standalone checkout.
+PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data'
 PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_data')
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 

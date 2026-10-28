@@ -35,6 +35,9 @@ For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug a
 
 ```
 drug_response_morphology/
+├── process_imaging_data/              # nested standalone pipeline (own repo history, own environment.yml/tests) -
+│                                       #   turns raw track tables into {drug}_metadata.csv + combined_masks/;
+│                                       #   see process_imaging_data/README.md for its own structure
 ├── shared/                            # reusable across every analysis
 │   ├── cajal/
 │   │   ├── extract_masks.py           # crops selected cells' masks
@@ -94,8 +97,8 @@ Anything genuinely reusable across analyses (not just this one) belongs in `shar
 
 ## Prerequisites
 
-- `process_imaging_data` has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/`.
-- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that repo's location (`/gpfs/projects/b1042/GoyalLab/sohini/process_imaging_data`).
+- `process_imaging_data/` (nested in this repo - see below) has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/`.
+- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that directory's location (`/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data`).
 
 ---
 
@@ -113,7 +116,9 @@ mamba env create -f environment.yml
 conda activate drug_response_morphology
 ```
 
-One environment is shared across every analysis.
+One environment is shared across every analysis (`naive_vs_vem` and `vem_48hr_pretreatment`).
+
+`process_imaging_data/` is a separate, self-contained sub-project with its own `environment.yml` (MATLAB `.mat` parsing, segmentation mask building - a different dependency set than CAJAL/UMAP) - set it up separately per `process_imaging_data/README.md` before running anything there.
 
 ---
 

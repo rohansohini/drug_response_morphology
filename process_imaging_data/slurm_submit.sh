@@ -11,7 +11,7 @@
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /projects/b1042/GoyalLab/sohini/process_imaging_data/
+cd /projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data/
 conda activate process_imaging
 
 mkdir -p logs
