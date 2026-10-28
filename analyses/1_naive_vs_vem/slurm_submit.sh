@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=64
 #SBATCH --mem=256G
 #SBATCH --time=24:00:00
-#SBATCH --job-name=naive_vs_vem
-#SBATCH --output=./logs/naive_vs_vem_%j.out
+#SBATCH --job-name=1_naive_vs_vem
+#SBATCH --output=./logs/1_naive_vs_vem_%j.out
 
 module purge
 eval "$(conda shell.bash hook)"

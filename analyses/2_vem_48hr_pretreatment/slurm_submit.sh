@@ -6,8 +6,8 @@
 #SBATCH --cpus-per-task=52
 #SBATCH --mem=192G
 #SBATCH --time=24:00:00
-#SBATCH --job-name=vem_48hr_pretreatment
-#SBATCH --output=./logs/vem_48hr_pretreatment_%j.out
+#SBATCH --job-name=2_vem_48hr_pretreatment
+#SBATCH --output=./logs/2_vem_48hr_pretreatment_%j.out
 
 module purge
 eval "$(conda shell.bash hook)"
