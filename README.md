@@ -2,7 +2,13 @@
 
 Morphology analyses built on [CAJAL](https://github.com/CamaraLab/CAJAL) Gromov-Wasserstein shape distances and UMAP, reading cell/nuclear segmentation metadata produced by `process_imaging_data`.
 
-This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`.
+This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`. `process_imaging_data/` is the pipeline both analyses depend on for their input data - it isn't itself one of the analyses, so like `shared/` it sits outside `analyses/`.
+
+---
+
+## [`process_imaging_data`](process_imaging_data/README.md)
+
+Turns raw track/segmentation `.mat` data into the `{drug}_metadata.csv` and `combined_masks/` that every analysis below reads as its input.
 
 ---
 
@@ -18,24 +24,27 @@ Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` condit
 
 Asks whether a cell's shape *before* vemurafenib treatment relates to what it eventually becomes, by resolving each pre-treatment lineage's mixture of day-0 fates.
 
-### [`process_imaging_data`](analyses/process_imaging_data/README.md)
-
-Turns raw track/segmentation `.mat` data into the `{drug}_metadata.csv` and `combined_masks/` that both analyses above read as their input.
-
 ---
 
 ## Directory structure
 
 ```
 drug_response_morphology/
+├── process_imaging_data/              # pipeline analyses/ depends on for its input data
+│   ├── README.md                      # raw data format, pipeline steps, output columns, classification logic
+│   ├── main.py
+│   ├── config.py                      # drug conditions, raw data paths, day-0 frames
+│   ├── pipeline/
+│   ├── slurm_submit.sh
+│   └── processed_data/                # generated (gitignored)
 ├── shared/                            # reusable across every analysis
 │   ├── cajal/
 │   │   ├── extract_masks.py           # crops selected cells' masks
 │   │   ├── run_cajal.py               # CAJAL icdm + quantized GW distances
-│   │   └── embed.py                   # loads the distance matrix; UMAP on it
+│   │   └── embed.py                   # loads the distance matrix; UMAP/PHATE on it
 │   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
-│   ├── load_data.py                   # merges UMAP coordinates / distance-matrix labels with metadata
-│   └── density_plots.py               # shared KDE-over-UMAP plotting (hard-label and weighted), PDF export
+│   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
+│   └── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 ├── analyses/
 │   ├── naive_vs_vem/
 │   │   ├── README.md
@@ -46,29 +55,22 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/                 # the 3 notebooks (see analyses/naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   ├── vem_48hr_pretreatment/
-│   │   ├── README.md
-│   │   ├── main.py
-│   │   ├── config.py                  # dataset name, frames, paths
-│   │   ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
-│   │   ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
-│   │   ├── slurm_submit.sh
-│   │   ├── notebooks/
-│   │   └── output/                    # generated (gitignored)
-│   └── process_imaging_data/
-│       ├── README.md                  # raw data format, pipeline steps, output columns, classification logic
+│   └── vem_48hr_pretreatment/
+│       ├── README.md
 │       ├── main.py
-│       ├── config.py                  # drug conditions, raw data paths, day-0 frames
-│       ├── pipeline/
+│       ├── config.py                  # dataset name, frames, paths
+│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
+│       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
 │       ├── slurm_submit.sh
-│       └── processed_data/            # generated (gitignored)
+│       ├── notebooks/
+│       └── output/                    # generated (gitignored)
 ├── tests/
+│   ├── process_imaging_data/          # tests for process_imaging_data/
 │   ├── shared/                        # tests for shared/ - no real data needed
 │   └── analyses/
 │       ├── naive_vs_vem/
-│       ├── vem_48hr_pretreatment/
-│       └── process_imaging_data/
-└── environment.yml                    # shared across every analysis
+│       └── vem_48hr_pretreatment/
+└── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 
 Each analysis's `output/` follows the same shape:
@@ -98,8 +100,8 @@ Anything genuinely reusable across analyses (not just this one) belongs in `shar
 
 ## Prerequisites
 
-- The `process_imaging_data` analysis has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/` (see [`analyses/process_imaging_data/README.md`](analyses/process_imaging_data/README.md)).
-- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that directory's location (`/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/process_imaging_data`).
+- `process_imaging_data` has already been run for whatever drug condition(s) this analysis needs, producing `{drug}_metadata.csv` and `combined_masks/` under its own `processed_data/` (see [`process_imaging_data/README.md`](process_imaging_data/README.md)).
+- Each analysis's `config.py`'s `PROCESS_IMAGING_DATA_ROOT` points at that directory's location (`/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data`).
 
 ---
 
@@ -117,7 +119,7 @@ mamba env create -f environment.yml
 conda activate drug_morpho
 ```
 
-One environment (`drug_morpho`) is shared across every analysis.
+One environment (`drug_morpho`) is shared across every analysis and `process_imaging_data`.
 
 ### Using this environment in a Jupyter notebook on Quest
 

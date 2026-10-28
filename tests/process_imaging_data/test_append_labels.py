@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/analyses/process_imaging_data/test_append_labels.py
+Run directly: python3 tests/process_imaging_data/test_append_labels.py
 '''
 import os
 import sys
@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'process_imaging_data')
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'process_imaging_data')
 sys.path.insert(0, ANALYSIS_DIR)
 from pipeline.append_labels import append_labels
 

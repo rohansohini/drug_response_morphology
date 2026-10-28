@@ -15,7 +15,7 @@ from pipeline.utils.image_utils  import save_failure_examples
 # config.py's PROCESSED_DATA_DIR/COMBINED_MASKS_DIR are relative paths,
 # which Python resolves against the current working directory at runtime,
 # not this script's own location - if main.py is ever invoked as
-# `python analyses/process_imaging_data/main.py` from somewhere else (e.g.
+# `python process_imaging_data/main.py` from somewhere else (e.g.
 # the repo root) rather than `cd`-ing into this directory first, those
 # paths would silently resolve under the wrong directory. Re-anchor them
 # to this script's own directory, same as every other analysis's main.py.

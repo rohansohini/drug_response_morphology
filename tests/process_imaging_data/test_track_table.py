@@ -15,7 +15,7 @@ the real scenario) and checks that every pred_node_id resolves to the
 correct global node_id after make_master_ids - i.e., to the row that is
 actually that cell's parent, not just some row that used to sit near it.
 
-Run directly: python3 tests/analyses/process_imaging_data/test_track_table.py
+Run directly: python3 tests/process_imaging_data/test_track_table.py
 '''
 import os
 import sys
@@ -23,7 +23,7 @@ import sys
 import numpy as np
 import pandas as pd
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'process_imaging_data')
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'process_imaging_data')
 sys.path.insert(0, ANALYSIS_DIR)
 from pipeline.track_table import make_master_ids
 

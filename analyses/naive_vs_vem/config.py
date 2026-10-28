@@ -31,7 +31,7 @@ FAST_K_LABELS      = [3, 4, 5, 6]
 ###### Paths
 #  process_imaging_data's output is read directly from its own
 #  processed_data/ - no copy step.
-PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/process_imaging_data'
+PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data'
 PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_data')
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 

@@ -17,7 +17,7 @@ import config
 # at import time to reuse process_imaging_data's own pipeline code - point
 # it at the real nested location instead of config.py's placeholder path,
 # so `import lineage_fate` below actually finds `pipeline.*`
-config.PROCESS_IMAGING_DATA_ROOT = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'process_imaging_data')
+config.PROCESS_IMAGING_DATA_ROOT = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'process_imaging_data')
 
 import lineage_fate
 

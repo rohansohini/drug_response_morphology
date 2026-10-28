@@ -9,7 +9,7 @@ By Rohan Sohini with help from Claude Sonnet 4.6 Medium
 ## Directory Structure
 
 ```
-analyses/process_imaging_data/
+process_imaging_data/
 ├── main.py
 ├── config.py
 ├── slurm_submit.sh
@@ -184,14 +184,14 @@ Dependencies are defined in the repo's shared `environment.yml` - see the root R
 
 ```bash
 conda activate drug_morpho
-cd analyses/process_imaging_data
+cd process_imaging_data
 python main.py
 ```
 
 ### On Quest (HPC)
 
 ```bash
-cd /{YOUR_PATH}/analyses/process_imaging_data
+cd /{YOUR_PATH}/process_imaging_data
 sbatch slurm_submit.sh
 ```
 

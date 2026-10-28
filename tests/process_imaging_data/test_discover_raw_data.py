@@ -1,12 +1,12 @@
 '''
-Run directly: python3 tests/analyses/process_imaging_data/test_discover_raw_data.py
+Run directly: python3 tests/process_imaging_data/test_discover_raw_data.py
 '''
 import os
 import sys
 import shutil
 import tempfile
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', 'process_imaging_data')
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'process_imaging_data')
 sys.path.insert(0, ANALYSIS_DIR)
 from pipeline.discover_raw_data import discover_tracks
 
