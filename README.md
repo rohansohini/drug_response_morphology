@@ -8,7 +8,7 @@ This repo holds multiple, independent analyses, each self-contained under `analy
 
 ## [`process_imaging_data`](process_imaging_data/README.md)
 
-Turns raw track/segmentation `.mat` data into the `{drug}_metadata.csv` and `combined_masks/` that every analysis below reads as its input.
+Turns raw track/segmentation `.mat` data (under `raw_data/`) into the `{drug}_metadata.csv` and `combined_masks/` that every analysis below reads as its input.
 
 ---
 
@@ -30,6 +30,7 @@ Asks whether a cell's shape *before* vemurafenib treatment relates to what it ev
 
 ```
 drug_response_morphology/
+├── raw_data/                          # gitignored - each drug condition's raw .mat/tiff data; see process_imaging_data/config.py's DRUG_DIRS
 ├── process_imaging_data/              # pipeline analyses/ depends on for its input data
 │   ├── README.md                      # raw data format, pipeline steps, output columns, classification logic
 │   ├── main.py
@@ -76,7 +77,7 @@ drug_response_morphology/
 Each analysis's `output/` follows the same shape:
 ```
 output/
-├── masks/, cajal_output/              # extracted masks, CAJAL distances, UMAP embeddings
+├── masks/, cajal_output/              # extracted masks, CAJAL distances, UMAP/PHATE embeddings
 └── plots/
     └── {notebook_name}/
         ├── pdfs/                      # one combined, multi-page PDF per modality, e.g. cell.pdf
@@ -89,7 +90,7 @@ output/
 
 1. `mkdir -p analyses/<name>/notebooks`
 2. Write `analyses/<name>/config.py` - at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions/frames/sampling).
-3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `naive_vs_vem/select_cells.py` for budget-based sampling, or `vem_48hr_pretreatment/load_all_cells.py` for "use everything").
+3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `0_naive_vs_vem/select_cells.py` for budget-based sampling, or `1_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
 4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom) - copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each under its own subfolder (see any existing notebook's cell 3) - follow that same pattern rather than picking just one.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
 6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together - see any existing analysis's README for the expected level of detail.
@@ -136,14 +137,14 @@ After that, `Python (drug_morpho)` appears as a selectable kernel in any new Que
 
 ## Running an analysis
 
-**Step 1 - the heavy part (cell selection/loading, mask extraction, CAJAL, UMAP):**
+**Step 1 - the heavy part (cell selection/loading, mask extraction, CAJAL, UMAP, PHATE):**
 
 ```bash
 cd analyses/<name>
 sbatch slurm_submit.sh
 ```
 
-This runs that analysis's `main.py`, which is safe to re-submit if it times out or fails partway - CAJAL and the UMAP fit each skip recomputation if their output file already exists, so a re-run resumes rather than restarting from scratch.
+This runs that analysis's `main.py`, which is safe to re-submit if it times out or fails partway - mask extraction, CAJAL, and the UMAP/PHATE fits each skip recomputation of what's already on disk, so a re-run resumes rather than restarting from scratch.
 
 To run it directly instead (e.g. for a quick local check):
 ```bash
