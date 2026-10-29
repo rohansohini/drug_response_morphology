@@ -104,7 +104,7 @@ def test_export_kde_by_frame_writes_pdf_tiff_and_one_svg_per_frame(tmp_dir='/tmp
 
 def test_kde_contours_are_unfilled_outlines_at_default_levels():
     # regression test: plot_embedding_with_kde must draw unfilled contour
-    # lines (fill=False) at exactly the default levels (0.3, 0.5, 0.7),
+    # lines (fill=False) at exactly the default levels (0.7, 0.8, 0.9),
     # not a filled density blob at 5 auto-spaced levels.
     rng = np.random.default_rng(0)
     df = pd.DataFrame({
@@ -118,14 +118,14 @@ def test_kde_contours_are_unfilled_outlines_at_default_levels():
 
     # both fill=True and fill=False produce a QuadContourSet - get_fill()
     # is the actual signal for filled vs. outline-only, and len(.levels)
-    # confirms exactly 3 contour lines (0.3, 0.5, 0.7) rather than the old
+    # confirms exactly 3 contour lines (0.7, 0.8, 0.9) rather than the old
     # default of 5 auto-spaced levels
     from matplotlib.contour import QuadContourSet
     contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
     assert len(contour_sets) == 1, f"expected exactly one KDE contour set, got {len(contour_sets)}"
     assert contour_sets[0].get_fill() is False, "expected an unfilled (outline-only) KDE contour"
     assert len(contour_sets[0].levels) == 3, \
-        f"expected exactly 3 contour levels (0.3, 0.5, 0.7), got {len(contour_sets[0].levels)}"
+        f"expected exactly 3 contour levels (0.7, 0.8, 0.9), got {len(contour_sets[0].levels)}"
 
     print("PASS: KDE contours are drawn as unfilled outlines at exactly 3 levels")
 
@@ -195,7 +195,7 @@ def test_export_kde_by_frame_uses_identical_axes_across_frames():
 def test_weighted_kde_contours_are_unfilled_outlines_at_default_levels():
     # regression test: plot_embedding_with_weighted_kde must draw unfilled
     # contour lines (fill=False) at exactly the default levels
-    # (0.3, 0.5, 0.7), matching the same outline-only convention as the
+    # (0.7, 0.8, 0.9), matching the same outline-only convention as the
     # hard-label version.
     rng = np.random.default_rng(0)
     n = 100
@@ -213,7 +213,7 @@ def test_weighted_kde_contours_are_unfilled_outlines_at_default_levels():
     assert len(contour_sets) == 1, f"expected exactly one KDE contour set, got {len(contour_sets)}"
     assert contour_sets[0].get_fill() is False, "expected an unfilled (outline-only) KDE contour"
     assert len(contour_sets[0].levels) == 3, \
-        f"expected exactly 3 contour levels (0.3, 0.5, 0.7), got {len(contour_sets[0].levels)}"
+        f"expected exactly 3 contour levels (0.7, 0.8, 0.9), got {len(contour_sets[0].levels)}"
 
     print("PASS: weighted KDE contours are drawn as unfilled outlines at exactly 3 levels")
 

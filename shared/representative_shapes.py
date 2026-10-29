@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import tifffile
 import matplotlib.pyplot as plt
+from IPython.display import display
 from sklearn.cluster import KMeans
 
 from shared.cajal.extract_masks import extracted_mask_paths
@@ -188,6 +189,9 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     output_dir/{file_prefix}.pdf
     output_dir/svgs/{file_prefix}.svg
 
+    Also displays the figure directly in the notebook's output, so you
+    don't have to open the saved files just to see it.
+
     Outputs:
         df: from pick_representative_shapes, for notebook inspection
     '''
@@ -198,6 +202,7 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     os.makedirs(svg_dir, exist_ok=True)
     fig.savefig(os.path.join(output_dir, f'{file_prefix}.pdf'), bbox_inches='tight')
     fig.savefig(os.path.join(svg_dir, f'{file_prefix}.svg'), bbox_inches='tight')
+    display(fig)
     plt.close(fig)
     print(f"  Saved to {output_dir}")
 

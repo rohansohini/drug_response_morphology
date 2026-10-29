@@ -5,10 +5,11 @@ import tifffile
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
+from IPython.display import display
 import seaborn as sns
 
 
-def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.3, 0.5, 0.7), xlim=None, ylim=None):
+def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2, xlim=None, ylim=None):
     '''
     Scatter every cell in df (light grey background), then overlay a KDE
     contour per group in group_col. Works on any 2D embedding (UMAP,
@@ -32,7 +33,13 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
                          noise, not signal - better to omit it than show a
                          misleading shape)
         levels:          iso-proportion levels to draw as unfilled contour
-                         lines (outline only, no fill)
+                         lines (outline only, no fill) - level p encloses
+                         the densest (1-p) fraction of that group's mass,
+                         so higher values are tighter, closer-to-the-peak
+                         rings
+        bw_adjust:       KDE bandwidth multiplier - above 1 smooths over
+                         sampling/distance-tie noise, below 1 hews closer
+                         to the raw point density
         xlim, ylim:      (min, max) tuples to fix the axes to, or None to
                          auto-scale to this call's own data (see
                          export_kde_by_frame, which fixes these across
@@ -53,9 +60,7 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
         sns.kdeplot(
             x=subset['dim_0'], y=subset['dim_1'], ax=ax,
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
-            bw_adjust=1.2,  # smooth over sampling/distance-tie noise a bit, since we're
-                            # now contouring tight around the peak (see levels above) -
-                            # a noisy, under-smoothed KDE shows more spurious bumps there
+            bw_adjust=bw_adjust,
         )
         legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5, label=f'{group} (n={len(subset)})'))
 
@@ -69,7 +74,7 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
     ax.legend(handles=legend_handles, fontsize=8)
 
 
-def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.3, 0.5, 0.7), xlim=None, ylim=None):
+def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2, xlim=None, ylim=None):
     '''
     Like plot_embedding_with_kde, but for cells with a MIXTURE of group
     membership instead of one hard label - e.g. each cell has its own
@@ -97,8 +102,8 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
                           to less than this across every cell (mirrors
                           plot_embedding_with_kde's min_group_size - a KDE
                           built from almost no weight is noise, not signal)
-        levels:           iso-proportion levels to draw as unfilled
-                          contour lines (outline only, no fill)
+        levels:           see plot_embedding_with_kde
+        bw_adjust:        see plot_embedding_with_kde
         xlim, ylim:       see plot_embedding_with_kde
     '''
     ax.scatter(df['dim_0'], df['dim_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
@@ -112,7 +117,7 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
         sns.kdeplot(
             x=df['dim_0'], y=df['dim_1'], weights=weights, ax=ax,
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
-            bw_adjust=1.2,  # see plot_embedding_with_kde
+            bw_adjust=bw_adjust,
         )
         legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5,
                                       label=f'{group} (total weight={total_weight:.1f})'))
@@ -142,7 +147,7 @@ def _rasterize(fig, dpi=150):
     return np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
 
 
-def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5):
+def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2):
     '''
     One combined, multi-page PDF, one stacked multi-page TIFF (one page
     per frame, for turning into a video later), and one SVG per frame (in
@@ -155,6 +160,10 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     output_dir/{file_prefix}.pdf
     output_dir/{file_prefix}.tiff
     output_dir/svgs/{file_prefix}_frame_NN.svg
+
+    Also displays each frame's figure directly in the notebook's output
+    as it's generated, so you don't have to open the saved files just to
+    see them.
 
     Every page shares the same, fixed axis limits, computed once from
     every frame's cells in df together and padded 5% on each side,
@@ -176,6 +185,8 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
                          (axis labels only, e.g. 'UMAP' or 'PHATE')
         title_prefix:    prefix for each plot's title (defaults to file_prefix if not given)
         min_group_size:  passed through to plot_embedding_with_kde
+        levels:          passed through to plot_embedding_with_kde
+        bw_adjust:       passed through to plot_embedding_with_kde
     '''
     title_prefix = file_prefix if title_prefix is None else title_prefix
 
@@ -206,11 +217,12 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
             plot_embedding_with_kde(
                 subset, group_col, group_colors, ax,
                 f'{title_prefix}: frame {frame}', embedding_label, min_group_size=min_group_size,
-                xlim=xlim, ylim=ylim,
+                levels=levels, bw_adjust=bw_adjust, xlim=xlim, ylim=ylim,
             )
             pdf.savefig(fig, bbox_inches='tight')
             fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
             frame_images.append(_rasterize(fig))
+            display(fig)   # show it in the notebook's own output, not just save it to disk
             plt.close(fig)
 
     tifffile.imwrite(tiff_path, np.stack(frame_images), photometric='rgb')
