@@ -15,5 +15,10 @@ eval "$(conda shell.bash hook)"
 cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/2_vem_48hr_pretreatment
 conda activate drug_morpho
 
+# unbuffer stdout so print() shows up in the log in real time, instead of
+# sitting in a buffer until it fills up (which also made CAJAL/UMAP/PHATE's
+# progress interleave out of order with stderr warnings, which are unbuffered)
+export PYTHONUNBUFFERED=1
+
 mkdir -p logs
 python main.py
