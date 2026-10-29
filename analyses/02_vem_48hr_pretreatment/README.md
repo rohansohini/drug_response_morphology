@@ -6,6 +6,7 @@ For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug a
 2. **Runs CAJAL** once per modality on frame-1 cells, then fits UMAP and PHATE directly on that distance matrix.
 3. **Resolves each frame-1 lineage's eventual fate mixture** (`lineage_fate.py`): a frame-1 lineage can already have divided by day 0 (e.g. 3 cells at frame 1 expanding to 100 by day 0), and each of those day-0 descendants can land in a *different* subclass. So instead of one hard label, each frame-1 cell gets `%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, resolved from `lineage_frame3_to_frame1.mat` and `clone_kmeans_id.mat` (raw, track-local lineage IDs resolved to this analysis's own `lin_id` by reusing `process_imaging_data`'s `load_track`/`make_master_ids` directly).
 4. **`01_frame1_fate_mixture.ipynb`** plots that mixture as a weighted KDE per fate category over the frame-1 embedding (both UMAP and PHATE). Every cell contributes to every category's contour in proportion to its own percentage in that category, rather than being forced into one dominant-fate bucket (`shared/density_plots.py`'s `plot_embedding_with_weighted_kde`).
+5. **`00_representative_shapes.ipynb`** k-means clusters the full frame-1 embedding into a few regions and shows each region's actual representative cell shape.
 
 ---
 

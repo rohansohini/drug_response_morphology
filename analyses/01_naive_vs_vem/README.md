@@ -5,7 +5,8 @@ Compares cell and nuclear morphology between the `naive` and `vem_1uM` condition
 1. **Selects cells** for CAJAL from both conditions, every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and sampled with an 80/20 vem/naive budget split (`select_cells.py` / `allocation.py`).
 2. **Runs CAJAL** once per modality (cell, nucleus) on the combined selection.
 3. **Fits UMAP and PHATE directly on the CAJAL distance matrix** (`metric='precomputed'`/`knn_dist='precomputed_distance'`).
-4. **Three notebooks** read those shared embeddings and plot different comparisons:
+4. **Four notebooks** read those shared embeddings:
+   - `00_representative_shapes.ipynb`: k-means clusters the full embedding into a few regions and shows each region's actual representative cell shape
    - `01_umap_by_condition_over_time.ipynb`: every cell, every subclass, KDE per condition
    - `02_proliferators_vem_vs_naive.ipynb`: proliferators only (`m_label == 3`), KDE per condition
    - `03_vem_subclasses_over_time.ipynb`: vem only, KDE per subclass

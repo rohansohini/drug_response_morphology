@@ -45,7 +45,8 @@ drug_response_morphology/
 │   │   └── embed.py                   # loads the distance matrix; UMAP/PHATE on it
 │   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
-│   └── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
+│   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
+│   └── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
 ├── analyses/
 │   ├── 01_naive_vs_vem/
 │   │   ├── README.md
@@ -54,7 +55,7 @@ drug_response_morphology/
 │   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
-│   │   ├── notebooks/                 # the 3 notebooks (see analyses/01_naive_vs_vem/README.md)
+│   │   ├── notebooks/                 # the 4 notebooks (see analyses/01_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
 │   └── 02_vem_48hr_pretreatment/
 │       ├── README.md
