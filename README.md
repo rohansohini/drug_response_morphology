@@ -2,7 +2,7 @@
 
 Morphology analyses built on [CAJAL](https://github.com/CamaraLab/CAJAL) Gromov-Wasserstein shape distances and UMAP, reading cell/nuclear segmentation metadata produced by `process_imaging_data`.
 
-This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`. `process_imaging_data/` is the pipeline both analyses depend on for their input data - it isn't itself one of the analyses, so like `shared/` it sits outside `analyses/`.
+This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`. `process_imaging_data/` is the pipeline both analyses depend on for their input data: it isn't itself one of the analyses, so like `shared/` it sits outside `analyses/`.
 
 ---
 
@@ -18,7 +18,7 @@ Each analysis is self-contained under `analyses/<name>/`, with its own README co
 
 ### [`naive_vs_vem`](analyses/01_naive_vs_vem/README.md)
 
-Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` conditions over time, via a shared CAJAL/UMAP embedding sampled across both conditions.
+Compares cell and nuclear morphology between the `naive` and `vem_1uM` conditions over time, via a shared CAJAL embedding sampled across both conditions.
 
 ### [`vem_48hr_pretreatment`](analyses/02_vem_48hr_pretreatment/README.md)
 
@@ -30,7 +30,7 @@ Asks whether a cell's shape *before* vemurafenib treatment relates to what it ev
 
 ```
 drug_response_morphology/
-├── raw_data/                          # gitignored - each drug condition's raw .mat/tiff data; see process_imaging_data/config.py's DRUG_DIRS
+├── raw_data/                          # gitignored: each drug condition's raw .mat/tiff data; see process_imaging_data/config.py's DRUG_DIRS
 ├── process_imaging_data/              # pipeline analyses/ depends on for its input data
 │   ├── README.md                      # raw data format, pipeline steps, output columns, classification logic
 │   ├── main.py
@@ -60,14 +60,14 @@ drug_response_morphology/
 │       ├── README.md
 │       ├── main.py
 │       ├── config.py                  # dataset name, frames, paths
-│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification - see lineage_fate.py)
+│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification, see lineage_fate.py)
 │       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
 │       ├── slurm_submit.sh
 │       ├── notebooks/
 │       └── output/                    # generated (gitignored)
 ├── tests/
 │   ├── process_imaging_data/          # tests for process_imaging_data/
-│   ├── shared/                        # tests for shared/ - no real data needed
+│   ├── shared/                        # tests for shared/, no real data needed
 │   └── analyses/
 │       ├── 01_naive_vs_vem/
 │       └── 02_vem_48hr_pretreatment/
@@ -80,8 +80,9 @@ output/
 ├── masks/, cajal_output/              # extracted masks, CAJAL distances, UMAP/PHATE embeddings
 └── plots/
     └── {notebook_name}/
-        ├── pdfs/                      # one combined, multi-page PDF per modality, e.g. cell.pdf
-        └── svgs/                      # one SVG per frame, e.g. cell_frame_01.svg
+        ├── {modality}_{embedding}.pdf   # one combined, multi-page PDF, e.g. cell_umap.pdf
+        ├── {modality}_{embedding}.tiff  # the same pages, stacked into one TIFF for making a video
+        └── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
 ```
 
 ---
@@ -89,11 +90,11 @@ output/
 ## Adding a new analysis
 
 1. `mkdir -p analyses/<name>/notebooks`
-2. Write `analyses/<name>/config.py` - at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions/frames/sampling).
-3. Write `analyses/<name>/main.py` - reuse `shared.cajal.extract_masks/run_cajal/embed` directly; only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `01_naive_vs_vem/select_cells.py` for budget-based sampling, or `02_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
-4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom) - copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each under its own subfolder (see any existing notebook's cell 3) - follow that same pattern rather than picking just one.
+2. Write `analyses/<name>/config.py`: at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions, frames, sampling).
+3. Write `analyses/<name>/main.py`, reusing `shared.cajal.extract_masks/run_cajal/embed` directly. Only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `01_naive_vs_vem/select_cells.py` for budget-based sampling, or `02_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
+4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom). Copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each with the embedding method as a filename suffix (see any existing notebook's cell 3): follow that same pattern rather than picking just one.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
-6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together - see any existing analysis's README for the expected level of detail.
+6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together. See any existing analysis's README for the expected level of detail.
 
 Anything genuinely reusable across analyses (not just this one) belongs in `shared/`, not copied into the new analysis folder.
 
@@ -113,7 +114,7 @@ conda env create -f environment.yml
 conda activate drug_morpho
 ```
 
-If `mamba` is available (`mamba --version`), use it instead - it's a drop-in replacement that reads this same `environment.yml` but resolves dependencies much faster:
+If `mamba` is available (`mamba --version`), use it instead: a drop-in replacement that reads this same `environment.yml` but resolves dependencies much faster.
 
 ```bash
 mamba env create -f environment.yml
@@ -124,27 +125,27 @@ One environment (`drug_morpho`) is shared across every analysis and `process_ima
 
 ### Using this environment in a Jupyter notebook on Quest
 
-Creating the environment above doesn't make it selectable in Quest's OnDemand Jupyter Notebook/JupyterLab interactive sessions - it has to be registered as a kernel once, with the environment activated:
+Creating the environment above doesn't make it selectable in Quest's OnDemand Jupyter Notebook/JupyterLab interactive sessions. It has to be registered as a kernel once, with the environment activated:
 
 ```bash
 conda activate drug_morpho
 python -m ipykernel install --user --name drug_morpho --display-name "Python (drug_morpho)"
 ```
 
-After that, `Python (drug_morpho)` appears as a selectable kernel in any new Quest OnDemand Jupyter session - no need to re-register it unless the environment is recreated from scratch.
+After that, `Python (drug_morpho)` appears as a selectable kernel in any new Quest OnDemand Jupyter session. No need to re-register it unless the environment is recreated from scratch.
 
 ---
 
 ## Running an analysis
 
-**Step 1 - the heavy part (cell selection/loading, mask extraction, CAJAL, UMAP, PHATE):**
+**Step 1: the heavy part (cell selection/loading, mask extraction, CAJAL, UMAP, PHATE)**
 
 ```bash
 cd analyses/<name>
 sbatch slurm_submit.sh
 ```
 
-This runs that analysis's `main.py`, which is safe to re-submit if it times out or fails partway - mask extraction, CAJAL, and the UMAP/PHATE fits each skip recomputation of what's already on disk, so a re-run resumes rather than restarting from scratch.
+This runs that analysis's `main.py`, which is safe to re-submit if it times out or fails partway: mask extraction, CAJAL, and the UMAP/PHATE fits each skip recomputation of what's already on disk, so a re-run resumes rather than restarting from scratch.
 
 To run it directly instead (e.g. for a quick local check):
 ```bash
@@ -152,15 +153,15 @@ cd analyses/<name>
 python main.py
 ```
 
-**Step 2 - the analysis notebooks:**
+**Step 2: the analysis notebooks**
 
-Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv` and each modality's `_umap.npz`/`_phate.npz` embeddings all exist under that analysis's own `output/`), open the notebooks in `analyses/<name>/notebooks/` with Jupyter and run them top to bottom - no SLURM job needed, they just load the saved embedding and plot.
+Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv` and each modality's `_umap.npz`/`_phate.npz` embeddings all exist under that analysis's own `output/`), open the notebooks in `analyses/<name>/notebooks/` with Jupyter and run them top to bottom. No SLURM job needed, they just load the saved embedding and plot.
 
 ---
 
 ## Classification scheme
 
-`shared/classify.py`'s `classify_subclass()` maps `m_label`/`k_label` (from `process_imaging_data`'s `cloneClassification`) to a subclass - but the actual numeric scheme is declared explicitly in each analysis's own `config.py` (`DYING_M_LABEL`, `PERSISTING_M_LABEL`, `PROLIF_M_LABEL`, `SLOW_K_LABELS`, `FAST_K_LABELS`), not hardcoded in `shared/`. Every analysis currently uses the same values:
+`shared/classify.py`'s `classify_subclass()` maps `m_label`/`k_label` (from `process_imaging_data`'s `cloneClassification`) to a subclass. The actual numeric scheme is declared explicitly in each analysis's own `config.py` (`DYING_M_LABEL`, `PERSISTING_M_LABEL`, `PROLIF_M_LABEL`, `SLOW_K_LABELS`, `FAST_K_LABELS`) rather than hardcoded in `shared/`. Every analysis currently uses the same values:
 
 | Subclass | Rule |
 |---|---|
@@ -169,13 +170,13 @@ Once `main.py` has completed (so `output/cajal_output/selected_metadata.csv` and
 | `slow_prolif` | `m_label == 3` and `k_label` in {1, 2} |
 | `fast_prolif` | `m_label == 3` and `k_label` in {3, 4, 5, 6} |
 
-What the upstream k-means clusters (`k_label` 1-6) actually represent, and why 1-2 means "slow" vs. 3-6 "fast", isn't derivable from either this repo or `process_imaging_data` - that's domain knowledge from whoever set up the clustering.
+What the upstream k-means clusters (`k_label` 1-6) actually represent, and why 1-2 means "slow" vs. 3-6 "fast", isn't derivable from either this repo or `process_imaging_data`. That's domain knowledge from whoever set up the clustering.
 
 ---
 
 ## Testing
 
-The test suite needs no real data - everything is synthetic:
+The test suite needs no real data: everything is synthetic.
 
 ```bash
 for f in $(find tests -name "test_*.py"); do python3 "$f"; done
