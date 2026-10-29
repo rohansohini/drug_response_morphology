@@ -14,8 +14,13 @@ FRAMES = [1]
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own
-#  processed_data/ - no copy step.
-PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data'
+#  processed_data/ - no copy step. process_imaging_data/ is part of this
+#  same repo, at a fixed location relative to this file (not wherever the
+#  repo happens to be checked out), so its root is derived from config.py's
+#  own location rather than a hardcoded absolute path.
+_THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, '..', '..'))
+PROCESS_IMAGING_DATA_ROOT = os.path.join(_REPO_ROOT, 'process_imaging_data')
 PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_data')
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
@@ -24,7 +29,9 @@ COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 #  above). Needed to read raw track_table_*.mat (to resolve
 #  lineage_frame3_to_frame1.mat's track-local IDs into global lin_ids -
 #  see lineage_fate.py) and the two .mat files below, which live
-#  alongside the raw track tables, not in processed_data/.
+#  alongside the raw track tables, not in processed_data/. Unlike
+#  PROCESS_IMAGING_DATA_ROOT above, raw_data/ is gitignored and may live
+#  outside the repo checkout entirely, so this stays an explicit path.
 RAW_DRUG_DIR = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_48hrsbefore'
 
 #  lineage_table: file_idx, new_clone_id_global, old_clone_id_frame1 - see

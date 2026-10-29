@@ -30,8 +30,13 @@ SAMPLE_SEED = 42
 
 ###### Paths
 #  process_imaging_data's output is read directly from its own
-#  processed_data/ - no copy step.
-PROCESS_IMAGING_DATA_ROOT = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/process_imaging_data'
+#  processed_data/ - no copy step. process_imaging_data/ is part of this
+#  same repo, at a fixed location relative to this file (not wherever the
+#  repo happens to be checked out), so its root is derived from config.py's
+#  own location rather than a hardcoded absolute path.
+_THIS_DIR  = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, '..', '..'))
+PROCESS_IMAGING_DATA_ROOT = os.path.join(_REPO_ROOT, 'process_imaging_data')
 PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_data')
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
