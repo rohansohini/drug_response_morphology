@@ -115,8 +115,15 @@ def get_phate_embedding(dist_csv: str, out_path: str, seed: int = 42) -> tuple[l
     # knn_dist='precomputed_distance' (rather than the ambiguous
     # 'precomputed') because PHATE would otherwise try to auto-detect
     # distance vs. affinity from whether the diagonal is all-zero - our GW
-    # distance matrix already is, so being explicit skips that guess
-    reducer   = phate.PHATE(n_components=2, knn_dist='precomputed_distance', random_state=seed, verbose=0)
+    # distance matrix already is, so being explicit skips that guess.
+    # knn=10 (default is 5) - our quantized GW distances have exact-zero
+    # ties between similarly-shaped cells often enough, at this many
+    # cells, that knn=5 was splitting the neighbor graph into several
+    # disconnected components (PHATE's own "Graph is disconnected"
+    # warning) - a wider neighborhood makes a single connected graph
+    # much more likely, at the cost of slightly blurring the finest local
+    # structure.
+    reducer   = phate.PHATE(n_components=2, knn=10, knn_dist='precomputed_distance', random_state=seed, verbose=0)
     embedding = reducer.fit_transform(dist_matrix)
     print(f"  PHATE done ({time.time() - t0:.1f}s)")
 
