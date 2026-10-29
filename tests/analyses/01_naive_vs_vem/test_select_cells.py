@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/analyses/1_naive_vs_vem/test_select_cells.py
+Run directly: python3 tests/analyses/01_naive_vs_vem/test_select_cells.py
 '''
 import os
 import sys
@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 REPO_ROOT    = os.path.join(os.path.dirname(__file__), '..', '..', '..')
-ANALYSIS_DIR = os.path.join(REPO_ROOT, 'analyses', '1_naive_vs_vem')
+ANALYSIS_DIR = os.path.join(REPO_ROOT, 'analyses', '01_naive_vs_vem')
 sys.path.insert(0, REPO_ROOT)      # for select_cells.py's `from shared.classify import ...`
 sys.path.insert(0, ANALYSIS_DIR)   # for `import config` / `from select_cells import ...`
 import config

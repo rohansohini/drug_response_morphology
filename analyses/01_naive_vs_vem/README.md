@@ -23,6 +23,6 @@ Compares cell and nuclear morphology between the `naive` and `A1_1uM_vem` condit
 Follows the same pattern as every other analysis - see the root README's "Running an analysis" section:
 
 ```bash
-cd analyses/1_naive_vs_vem
+cd analyses/01_naive_vs_vem
 sbatch slurm_submit.sh
 ```

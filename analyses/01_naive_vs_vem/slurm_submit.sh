@@ -3,16 +3,16 @@
 #SBATCH --partition=genomics
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=52
-#SBATCH --mem=192G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=256G
 #SBATCH --time=24:00:00
-#SBATCH --job-name=2_vem_48hr_pretreatment
-#SBATCH --output=./logs/2_vem_48hr_pretreatment_%j.out
+#SBATCH --job-name=01_naive_vs_vem
+#SBATCH --output=./logs/01_naive_vs_vem_%j.out
 
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/2_vem_48hr_pretreatment
+cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/01_naive_vs_vem
 conda activate drug_morpho
 
 # unbuffer stdout so print() shows up in the log in real time, instead of

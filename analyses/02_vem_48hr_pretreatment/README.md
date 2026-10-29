@@ -20,6 +20,6 @@ For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug a
 Follows the same pattern as every other analysis - see the root README's "Running an analysis" section:
 
 ```bash
-cd analyses/2_vem_48hr_pretreatment
+cd analyses/02_vem_48hr_pretreatment
 sbatch slurm_submit.sh
 ```
