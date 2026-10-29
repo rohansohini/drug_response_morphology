@@ -17,6 +17,7 @@ output/
 *.tiff
 *.tif
 *.csv
+*.zip
 
 # SLURM job logs
 logs/

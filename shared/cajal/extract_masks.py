@@ -27,6 +27,19 @@ def extracted_mask_paths(drug: str, frame: int, out_dir: str) -> tuple[str, str]
     return cell_path, nuc_path
 
 
+def _extracted_pixel_ids(mask_path: str) -> set:
+    '''
+    The set of pixel_ids actually baked into an already-extracted mask
+    TIFF - every non-zero label value in it (extract_frame_masks never
+    zeroes out a sampled cell's own label, only unsampled ones), so this
+    recovers exactly the sampled_ids that file was extracted with,
+    without needing a separate sidecar record of that set.
+    '''
+    arr = tifffile.imread(mask_path)
+    ids = np.unique(arr)
+    return set(ids[ids != 0].tolist())
+
+
 def extract_frame_masks(
     drug: str,
     frame: int,
@@ -95,17 +108,32 @@ def extract_masks(
 
     frames = sorted(df['frame'].unique())
 
-    # skip any frame whose extracted masks are already on disk - same
-    # exists-check pattern as run_cajal/get_umap_embedding/get_phate_embedding,
-    # so a rerun that's only after a new downstream step (e.g. PHATE) doesn't
-    # redo this frame-by-frame mask work for nothing
-    frames_to_extract = [
-        frame for frame in frames
-        if not all(os.path.exists(p) for p in extracted_mask_paths(drug, frame, out_dir))
-    ]
+    # skip a frame only if its extracted masks are already on disk AND
+    # still match the currently selected pixel_ids for that frame - same
+    # exists-check pattern as run_cajal/get_umap_embedding/get_phate_embedding
+    # for the "already there" case, so a rerun that's only after a new
+    # downstream step (e.g. PHATE) doesn't redo this frame-by-frame mask
+    # work for nothing. But a bare exists-check alone would silently keep
+    # a STALE mask whenever the upstream metadata/selection changed since
+    # the last run (e.g. a has_mask fix in process_imaging_data) without
+    # the cached file itself being deleted - comparing the cached file's
+    # own baked-in pixel_id set against what's currently expected catches
+    # that case and re-extracts instead of reusing a cache that no longer
+    # matches selected_metadata.csv.
+    frames_to_extract = []
+    for frame in frames:
+        cell_path, nuc_path = extracted_mask_paths(drug, frame, out_dir)
+        if not (os.path.exists(cell_path) and os.path.exists(nuc_path)):
+            frames_to_extract.append(frame)
+            continue
+        expected_ids = set(df[(df['frame'] == frame) & (df['sampled'])]['pixel_id'].values)
+        if _extracted_pixel_ids(cell_path) != expected_ids:
+            print(f"  {drug} frame {frame}: cached masks are stale (selected cells changed) - re-extracting")
+            frames_to_extract.append(frame)
+
     n_skipped = len(frames) - len(frames_to_extract)
     if n_skipped:
-        print(f"  Skipping {n_skipped}/{len(frames)} frame(s) ({drug}): already extracted")
+        print(f"  Skipping {n_skipped}/{len(frames)} frame(s) ({drug}): already extracted and up to date")
 
     Parallel(n_jobs=n_jobs)(
         delayed(extract_frame_masks)(

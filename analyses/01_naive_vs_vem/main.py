@@ -18,7 +18,7 @@ sys.path.insert(0, REPO_ROOT)
 import config
 from select_cells import select_cells
 from shared.cajal.extract_masks import extract_masks
-from shared.cajal.run_cajal import run_cajal
+from shared.cajal.run_cajal import run_cajal, needs_recompute
 from shared.cajal.embed import get_umap_embedding, get_phate_embedding
 
 # config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
@@ -80,15 +80,18 @@ def main():
     # deciding how many cores to give each one - splitting config.N_JOBS in
     # half unconditionally would waste half the allocation whenever only
     # one of the two is still needed (e.g. resuming after a partial run
-    # that already finished one modality)
+    # that already finished one modality). needs_recompute, not a bare
+    # exists check, so a dist CSV left over from BEFORE extract_masks
+    # re-extracted a now-stale frame (selection changed upstream) gets
+    # correctly redone instead of silently reused.
     needs_cajal = {
-        'cell': not os.path.exists(cell_dist_csv),
-        'nuc':  not os.path.exists(nuc_dist_csv),
+        'cell': needs_recompute(cell_dist_csv, cell_dir),
+        'nuc':  needs_recompute(nuc_dist_csv, nuc_dir),
     }
     for modality, needed in needs_cajal.items():
         if not needed:
             dist_csv = cell_dist_csv if modality == 'cell' else nuc_dist_csv
-            print(f"  Skipping {modality} CAJAL run: {dist_csv} already exists")
+            print(f"  Skipping {modality} CAJAL run: {dist_csv} already exists and is up to date")
 
     n_tasks = sum(needs_cajal.values())
     if n_tasks > 0:
