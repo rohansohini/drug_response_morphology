@@ -2,7 +2,7 @@
 
 Morphology analyses built on [CAJAL](https://github.com/CamaraLab/CAJAL) Gromov-Wasserstein shape distances and UMAP, reading cell/nuclear segmentation metadata produced by `process_imaging_data`.
 
-This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`. `process_imaging_data/` is the pipeline both analyses depend on for their input data: it isn't itself one of the analyses, so like `shared/` it sits outside `analyses/`.
+This repo holds multiple, independent analyses, each self-contained under `analyses/`, sharing common building blocks (CAJAL wrappers, classification, data merging, plotting) from `shared/`. `process_imaging_data/` is the pipeline every analysis depends on for its input data: it isn't itself one of the analyses, so like `shared/` it sits outside `analyses/`.
 
 ---
 
@@ -22,7 +22,11 @@ Compares cell and nuclear morphology between the `naive` and `vem_1uM` condition
 
 ### [`vem_48hr_pretreatment`](analyses/02_vem_48hr_pretreatment/README.md)
 
-Asks whether a cell's shape *before* vemurafenib treatment relates to what it eventually becomes, by resolving each pre-treatment lineage's mixture of day-0 fates.
+Asks whether a cell's shape *before* vemurafenib treatment predicts what it eventually becomes, via a k-nearest-neighbor prediction test directly on CAJAL distances.
+
+### [`multi_drug_comparison`](analyses/03_multi_drug_comparison/README.md)
+
+Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`, `gem_2.5nM`, `tram_6nM`) at two independent timepoints, each with its own separate CAJAL embedding.
 
 ---
 
@@ -58,12 +62,20 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/                 # the 4 notebooks (see analyses/01_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   └── 02_vem_48hr_pretreatment/
+│   ├── 02_vem_48hr_pretreatment/
+│   │   ├── README.md
+│   │   ├── main.py
+│   │   ├── config.py                  # dataset name, frames, paths
+│   │   ├── load_all_cells.py          # loads every available frame-1 cell (no classification, see lineage_fate.py)
+│   │   ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored)
+│   └── 03_multi_drug_comparison/
 │       ├── README.md
-│       ├── main.py
-│       ├── config.py                  # dataset name, frames, paths
-│       ├── load_all_cells.py          # loads every available frame-1 cell (no classification, see lineage_fate.py)
-│       ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
+│       ├── main.py                    # 4 independent CAJAL runs: one per (frame, modality)
+│       ├── config.py                  # conditions, frames, sample size per condition, paths
+│       ├── select_cells.py            # flat per-(frame, condition) sampling, no budget-splitting
 │       ├── slurm_submit.sh
 │       ├── notebooks/
 │       └── output/                    # generated (gitignored)
@@ -72,7 +84,8 @@ drug_response_morphology/
 │   ├── shared/                        # tests for shared/, no real data needed
 │   └── analyses/
 │       ├── 01_naive_vs_vem/
-│       └── 02_vem_48hr_pretreatment/
+│       ├── 02_vem_48hr_pretreatment/
+│       └── 03_multi_drug_comparison/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 
