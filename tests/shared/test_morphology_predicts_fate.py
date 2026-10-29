@@ -106,6 +106,21 @@ def test_plot_permutation_test_runs_without_error():
     print("PASS: plot_permutation_test runs without error")
 
 
+def test_plot_permutation_test_sets_the_given_title():
+    rng = np.random.default_rng(0)
+    null_errors = rng.normal(0.5, 0.05, 200)
+
+    fig = plot_permutation_test(null_errors, observed_error=0.3, p_value=0.085, title='cell morphology')
+    assert fig.axes[0].get_title() == 'cell morphology'
+    plt.close(fig)
+
+    fig = plot_permutation_test(null_errors, observed_error=0.3, p_value=0.085)
+    assert fig.axes[0].get_title() == '', "expected no title when title=None"
+    plt.close(fig)
+
+    print("PASS: plot_permutation_test sets the given title, or none at all when not given")
+
+
 def test_plot_permutation_test_reports_the_resolution_limit_when_p_is_zero():
     # 0/n_permutations beating the observed error doesn't mean p is
     # exactly 0 - the plot must report "< 1/n_permutations" instead of
@@ -129,5 +144,6 @@ if __name__ == '__main__':
     test_permutation_test_finds_strong_morphology_fate_relationship_when_one_exists()
     test_permutation_test_finds_no_relationship_when_fate_is_random()
     test_plot_permutation_test_runs_without_error()
+    test_plot_permutation_test_sets_the_given_title()
     test_plot_permutation_test_reports_the_resolution_limit_when_p_is_zero()
     print("\nAll tests passed.")

@@ -96,7 +96,7 @@ def knn_prediction_permutation_test(dist_matrix, mixture_matrix, k, n_permutatio
     return observed_error, null_errors, p_value, predicted
 
 
-def plot_permutation_test(null_errors, observed_error, p_value):
+def plot_permutation_test(null_errors, observed_error, p_value, title=None):
     '''
     The null distribution of mean_prediction_error under random fate-
     mixture reassignment (knn_prediction_permutation_test), with the
@@ -107,6 +107,7 @@ def plot_permutation_test(null_errors, observed_error, p_value):
         null_errors:    (n_permutations,) from knn_prediction_permutation_test
         observed_error: from knn_prediction_permutation_test
         p_value:        from knn_prediction_permutation_test
+        title:          plot title, or None for no title
     Outputs:
         fig: caller saves/closes this
     '''
@@ -126,6 +127,8 @@ def plot_permutation_test(null_errors, observed_error, p_value):
             color='tab:red', va='top')
     ax.set_xlabel('mean prediction error')
     ax.set_ylabel('number of permutations')
+    if title is not None:
+        ax.set_title(title)
 
     fig.tight_layout()
     return fig
