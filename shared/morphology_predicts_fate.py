@@ -78,7 +78,7 @@ def knn_prediction_permutation_test(dist_matrix, mixture_matrix, k, n_permutatio
                          means real morphology predicts fate far better
                          than a random reassignment ever manages to
         predicted:       (n, n_categories) the real (unpermuted) KNN
-                         predictions, for plotting predicted vs. actual
+                         predictions
     '''
     neighbor_idx = nearest_neighbor_indices(dist_matrix, k)
 
@@ -96,28 +96,17 @@ def knn_prediction_permutation_test(dist_matrix, mixture_matrix, k, n_permutatio
     return observed_error, null_errors, p_value, predicted
 
 
-def plot_prediction_results(true_mixture, predicted_mixture, null_errors, observed_error, p_value,
-                             category_names, category_colors, title):
+def plot_permutation_test(null_errors, observed_error, p_value):
     '''
-    One figure, two panels, summarizing knn_prediction_permutation_test's
-    result:
-      left:  predicted vs. true mixture fraction, pooled across every
-             category (colored by category), with a y=x reference line -
-             how GOOD the morphology-based prediction is
-      right: the null distribution of mean_prediction_error under random
-             label reassignment, with the real (observed) error marked -
-             how SIGNIFICANT that is compared to chance
+    The null distribution of mean_prediction_error under random fate-
+    mixture reassignment (knn_prediction_permutation_test), with the
+    real (observed) error marked - how much better real morphology
+    predicts fate than a random reassignment ever manages to.
 
     Inputs:
-        true_mixture:      (n, n_categories)
-        predicted_mixture: (n, n_categories), same column order
-        null_errors:       (n_permutations,) from knn_prediction_permutation_test
-        observed_error:    from knn_prediction_permutation_test
-        p_value:           from knn_prediction_permutation_test
-        category_names:    column names in display order, e.g.
-                           ['dying', 'persisting', 'slow_prolif', 'fast_prolif']
-        category_colors:   {category_name: color}
-        title:             figure title
+        null_errors:    (n_permutations,) from knn_prediction_permutation_test
+        observed_error: from knn_prediction_permutation_test
+        p_value:        from knn_prediction_permutation_test
     Outputs:
         fig: caller saves/closes this
     '''
@@ -129,27 +118,14 @@ def plot_prediction_results(true_mixture, predicted_mixture, null_errors, observ
     else:
         p_label = f'= {p_value:.4f}'
 
-    fig, (ax_scatter, ax_hist) = plt.subplots(1, 2, figsize=(11, 5))
+    fig, ax = plt.subplots(figsize=(6, 5))
 
-    for i, category in enumerate(category_names):
-        ax_scatter.scatter(true_mixture[:, i], predicted_mixture[:, i], s=6, alpha=0.3,
-                            color=category_colors[category], label=category)
-    ax_scatter.plot([0, 1], [0, 1], color='black', linestyle='--', linewidth=1, zorder=0)
-    ax_scatter.set_xlim(-0.05, 1.05)
-    ax_scatter.set_ylim(-0.05, 1.05)
-    ax_scatter.set_xlabel('actual fraction')
-    ax_scatter.set_ylabel('predicted fraction (k nearest morphological neighbors)')
-    ax_scatter.set_title('prediction accuracy')
-    ax_scatter.legend(fontsize=8)
+    ax.hist(null_errors, bins=30, color='lightgrey', edgecolor='grey')
+    ax.axvline(observed_error, color='tab:red', linewidth=2)
+    ax.text(observed_error, ax.get_ylim()[1] * 0.92, f'  observed\n  p {p_label}',
+            color='tab:red', va='top')
+    ax.set_xlabel('mean prediction error')
+    ax.set_ylabel('number of permutations')
 
-    ax_hist.hist(null_errors, bins=30, color='lightgrey', edgecolor='grey')
-    ax_hist.axvline(observed_error, color='tab:red', linewidth=2)
-    ax_hist.text(observed_error, ax_hist.get_ylim()[1] * 0.92, f'  observed\n  p {p_label}',
-                 color='tab:red', va='top')
-    ax_hist.set_xlabel('mean prediction error')
-    ax_hist.set_ylabel('permutations')
-    ax_hist.set_title('observed vs. randomly reassigned fate labels')
-
-    fig.suptitle(title)
     fig.tight_layout()
     return fig

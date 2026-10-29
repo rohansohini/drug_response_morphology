@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from shared.morphology_predicts_fate import (
     nearest_neighbor_indices, knn_predict_mixture, mean_prediction_error,
-    knn_prediction_permutation_test, plot_prediction_results,
+    knn_prediction_permutation_test, plot_permutation_test,
 )
 
 
@@ -95,23 +95,31 @@ def test_permutation_test_finds_no_relationship_when_fate_is_random():
     print("PASS: the permutation test correctly finds no relationship when fate is assigned at random")
 
 
-def test_plot_prediction_results_runs_without_error():
+def test_plot_permutation_test_runs_without_error():
     rng = np.random.default_rng(0)
-    n = 50
-    true_mixture = rng.dirichlet([1, 1], size=n)
-    predicted_mixture = rng.dirichlet([1, 1], size=n)
     null_errors = rng.normal(0.5, 0.05, 200)
-    observed_error = 0.3
 
-    fig = plot_prediction_results(
-        true_mixture, predicted_mixture, null_errors, observed_error, p_value=0.001,
-        category_names=['a', 'b'], category_colors={'a': 'tab:red', 'b': 'tab:blue'},
-        title='test',
-    )
+    fig = plot_permutation_test(null_errors, observed_error=0.3, p_value=0.085)
     assert fig is not None
     plt.close(fig)
 
-    print("PASS: plot_prediction_results runs without error")
+    print("PASS: plot_permutation_test runs without error")
+
+
+def test_plot_permutation_test_reports_the_resolution_limit_when_p_is_zero():
+    # 0/n_permutations beating the observed error doesn't mean p is
+    # exactly 0 - the plot must report "< 1/n_permutations" instead of
+    # overstating precision as "p = 0.0000"
+    rng = np.random.default_rng(0)
+    null_errors = rng.normal(0.5, 0.05, 200)
+
+    fig = plot_permutation_test(null_errors, observed_error=0.0, p_value=0.0)
+    ax = fig.axes[0]
+    text = ' '.join(t.get_text() for t in ax.texts)
+    assert '< 0.0050' in text, f"expected the 1/200 resolution limit reported, got: {text!r}"
+    plt.close(fig)
+
+    print("PASS: plot_permutation_test reports '< 1/n_permutations' instead of an overprecise p=0.0000")
 
 
 if __name__ == '__main__':
@@ -120,5 +128,6 @@ if __name__ == '__main__':
     test_mean_prediction_error_is_zero_for_a_perfect_prediction()
     test_permutation_test_finds_strong_morphology_fate_relationship_when_one_exists()
     test_permutation_test_finds_no_relationship_when_fate_is_random()
-    test_plot_prediction_results_runs_without_error()
+    test_plot_permutation_test_runs_without_error()
+    test_plot_permutation_test_reports_the_resolution_limit_when_p_is_zero()
     print("\nAll tests passed.")
