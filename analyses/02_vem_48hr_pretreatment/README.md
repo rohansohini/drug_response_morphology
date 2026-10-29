@@ -1,12 +1,11 @@
 # vem_48hr_pretreatment
 
-For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug addition), frame 3 is day 0 (when 1µM vemurafenib was added). This analysis only ever looks at **frame 1** (`config.FRAMES = [1]`). `process_imaging_data` doesn't classify a cell until day 0, so a frame-1 cell has no single subclass to compare across frames; the question here is whether a cell's shape *before* treatment relates to what it eventually becomes.
+For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug addition), frame 3 is day 0 (when 1µM vemurafenib was added). This analysis only ever looks at **frame 1** (`config.FRAMES = [1]`). `process_imaging_data` doesn't classify a cell until day 0, so a frame-1 cell has no single subclass to compare across frames; the question here is whether a cell's shape *before* treatment **predicts** what it eventually becomes.
 
 1. **Uses every available frame-1 cell/nucleus**, no sampling budget, unlike `naive_vs_vem` (`load_all_cells.py`).
-2. **Runs CAJAL** once per modality on frame-1 cells, then fits UMAP and PHATE directly on that distance matrix.
+2. **Runs CAJAL** once per modality on frame-1 cells. That's it for the pipeline: no UMAP/PHATE embedding is fit, since the question below is answered directly from the real distance matrix, not a 2D projection that distorts it.
 3. **Resolves each frame-1 lineage's eventual fate mixture** (`lineage_fate.py`): a frame-1 lineage can already have divided by day 0 (e.g. 3 cells at frame 1 expanding to 100 by day 0), and each of those day-0 descendants can land in a *different* subclass. So instead of one hard label, each frame-1 cell gets `%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, resolved from `lineage_frame3_to_frame1.mat` and `clone_kmeans_id.mat` (raw, track-local lineage IDs resolved to this analysis's own `lin_id` by reusing `process_imaging_data`'s `load_track`/`make_master_ids` directly).
-4. **`01_frame1_fate_mixture.ipynb`** plots that mixture as a weighted KDE per fate category over the frame-1 embedding (both UMAP and PHATE). Every cell contributes to every category's contour in proportion to its own percentage in that category, rather than being forced into one dominant-fate bucket (`shared/density_plots.py`'s `plot_embedding_with_weighted_kde`).
-5. **`00_representative_shapes.ipynb`** k-means clusters the full frame-1 embedding into a few regions and shows each region's actual representative cell shape.
+4. **`01_morphology_predicts_fate.ipynb`** asks: does pre-treatment shape predict that mixture? For each cell, it predicts the cell's own fate mixture from the mixtures of its *k* nearest neighbors in real morphological (CAJAL GW) distance, then tests whether that prediction beats chance by comparing its error against many random reassignments of mixture to cell (`shared/morphology_predicts_fate.py`'s `knn_prediction_permutation_test`). One figure per modality: predicted vs. actual mixture fractions next to the permutation null distribution.
 
 ---
 

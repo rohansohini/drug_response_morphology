@@ -46,7 +46,8 @@ drug_response_morphology/
 │   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
 │   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
-│   └── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
+│   ├── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
+│   └── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
 ├── analyses/
 │   ├── 01_naive_vs_vem/
 │   │   ├── README.md

@@ -19,7 +19,6 @@ import config
 from load_all_cells import load_all_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal
-from shared.cajal.embed import get_umap_embedding, get_phate_embedding
 
 # config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
 # which Python resolves against the current working directory at runtime,
@@ -38,12 +37,12 @@ def main():
     os.makedirs(config.MASKS_DIR, exist_ok=True)
     os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
 
-    # --- step 1: load metadata, restrict to config.FRAMES (frame 1 only), use every available cell ---
+    # --- step 1/3: load metadata, restrict to config.FRAMES (frame 1 only), use every available cell ---
     #  unlike naive_vs_vem, there's no sampling budget here - every
     #  has_mask=True frame-1 cell goes through CAJAL. No subclass here -
     #  process_imaging_data doesn't classify frame-1 cells (classification
     #  starts at day 0) - see lineage_fate.py for each cell's fate mixture.
-    print("[1/4] Loading metadata...")
+    print("[1/3] Loading metadata...")
     metadata = load_all_cells(config.metadata_csv_path(), config.FRAMES, config.DRUG)
 
     print(f"  {len(metadata)} cells across frames {sorted(metadata['frame'].unique())}")
@@ -52,15 +51,19 @@ def main():
     metadata.to_csv(selected_path, index=False)
     print(f"  Saved to {selected_path}")
 
-    # --- step 2: extract masks for every cell ---
-    print("\n[2/4] Extracting masks...")
+    # --- step 2/3: extract masks for every cell ---
+    print("\n[2/3] Extracting masks...")
     extract_masks(
         metadata, config.DRUG, config.COMBINED_MASKS_DIR, config.MASKS_DIR,
         n_jobs=config.N_JOBS, pad_size=config.PAD_SIZE,
     )
 
-    # --- step 3: run CAJAL once per modality, on frame-1 cells only ---
-    print("\n[3/4] Running CAJAL...")
+    # --- step 3/3: run CAJAL once per modality, on frame-1 cells only ---
+    #  the GW distance matrix this produces IS the morphology
+    #  representation used downstream (see notebooks/01_morphology_predicts_fate.ipynb) -
+    #  no UMAP/PHATE embedding is fit here, since the prediction test
+    #  needs the real distances, not a 2D projection that distorts them.
+    print("\n[3/3] Running CAJAL...")
     cell_dir = os.path.join(config.MASKS_DIR, 'cell')
     nuc_dir  = os.path.join(config.MASKS_DIR, 'nuc')
 
@@ -93,17 +96,6 @@ def main():
             tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
 
         Parallel(n_jobs=n_tasks)(tasks)
-
-    # --- step 4: fit UMAP and PHATE directly on the CAJAL distances ---
-    print("\n[4/4] Fitting embeddings...")
-    cell_umap_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_umap.npz')
-    nuc_umap_path   = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_umap.npz')
-    cell_phate_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'cell_phate.npz')
-    nuc_phate_path  = os.path.join(config.CAJAL_OUTPUT_DIR, 'nuc_phate.npz')
-    get_umap_embedding(cell_dist_csv, cell_umap_path, seed=config.UMAP_SEED)
-    get_umap_embedding(nuc_dist_csv, nuc_umap_path, seed=config.UMAP_SEED)
-    get_phate_embedding(cell_dist_csv, cell_phate_path, seed=config.PHATE_SEED)
-    get_phate_embedding(nuc_dist_csv, nuc_phate_path, seed=config.PHATE_SEED)
 
     print("\nDone.")
 
