@@ -10,14 +10,15 @@ CONDITIONS = ['naive', 'vem_1uM', 'gem_2.5nM', 'tram_6nM']
 ###### Frames
 #  Compares conditions at two INDEPENDENT timepoints, each with its own
 #  CAJAL run (not one shared embedding across frames like naive_vs_vem) -
-#  frame 1's embedding space has no relationship to END_FRAME's, since
+#  frame 1's embedding space has no relationship to frame 13's, since
 #  the question here is how conditions differ WITHIN a frame, never how
-#  a frame differs from another frame. END_FRAME defaults to
-#  process_imaging_data's own MAX_FRAME cutoff (see its config.py) -
-#  frames beyond that are unreliable (heavy overcrowding).
-START_FRAME = 1
-END_FRAME   = 13
-FRAMES      = [START_FRAME, END_FRAME]
+#  a frame differs from another frame. Frame 13 is the LAST frame any
+#  condition's metadata.csv can contain: process_imaging_data's own
+#  main.py already excludes anything beyond its MAX_FRAME (see
+#  process_imaging_data/config.py - frames beyond that are unreliable,
+#  heavy overcrowding) before this analysis ever sees the data, so
+#  there's no separate "end frame" cutoff to maintain here too.
+FRAMES = [1, 13]
 
 ###### Sampling
 #  Cells sampled per (frame, condition) bucket - see select_cells.py. A
@@ -45,7 +46,7 @@ def metadata_csv_path(condition: str) -> str:
 
 def frame_masks_dir(frame: int) -> str:
     '''
-    Each frame's own masks/ subfolder - frame 1 and END_FRAME's masks
+    Each frame's own masks/ subfolder - frame 1 and frame 13's masks
     never share a folder, since CAJAL treats everything in one folder as
     one shape space and these two frames must stay independent (see main.py).
     '''
