@@ -143,6 +143,31 @@ def test_plot_representative_shapes_runs_without_error():
     print("PASS: plot_representative_shapes runs without error")
 
 
+def test_plot_representative_shapes_applies_explicit_xlim_ylim():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    n = 20
+    df = pd.DataFrame({
+        'dim_0': rng.normal(0, 1, n), 'dim_1': rng.normal(0, 1, n),
+        'region': [i % 2 for i in range(n)],
+    })
+    shapes = pd.DataFrame({
+        'region': [0, 1], 'condition': ['naive', 'naive'], 'frame': [1, 1], 'pixel_id': [1, 2],
+        'crop': [np.zeros((10, 10), dtype=np.uint16), np.ones((10, 10), dtype=np.uint16)],
+    })
+
+    fig = plot_representative_shapes(df, shapes, 'UMAP', 'test', xlim=(-10, 10), ylim=(-20, 20))
+    scatter_ax = fig.axes[0]
+    assert scatter_ax.get_xlim() == (-10, 10), f"expected xlim (-10, 10), got {scatter_ax.get_xlim()}"
+    assert scatter_ax.get_ylim() == (-20, 20), f"expected ylim (-20, 20), got {scatter_ax.get_ylim()}"
+    plt.close(fig)
+
+    print("PASS: plot_representative_shapes applies explicit xlim/ylim when given")
+
+
 if __name__ == '__main__':
     test_assign_kmeans_regions_separates_well_separated_clusters()
     test_crop_cell_shape_isolates_only_the_requested_cell()
@@ -150,4 +175,5 @@ if __name__ == '__main__':
     test_crop_cell_shape_warns_when_half_width_too_small()
     test_pick_representative_shapes_picks_the_cell_closest_to_each_centroid()
     test_plot_representative_shapes_runs_without_error()
+    test_plot_representative_shapes_applies_explicit_xlim_ylim()
     print("\nAll tests passed.")

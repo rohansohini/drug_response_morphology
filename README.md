@@ -26,7 +26,7 @@ Asks whether a cell's shape *before* vemurafenib treatment predicts what it even
 
 ### [`multi_drug_comparison`](analyses/03_multi_drug_comparison/README.md)
 
-Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`, `gem_2.5nM`, `tram_6nM`) at two independent timepoints, each with its own separate CAJAL embedding.
+Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`, `gem_2.5nM`, `tram_6nM`) at two timepoints, sharing one CAJAL embedding per modality across both.
 
 ---
 
@@ -73,7 +73,7 @@ drug_response_morphology/
 │   │   └── output/                    # generated (gitignored)
 │   └── 03_multi_drug_comparison/
 │       ├── README.md
-│       ├── main.py                    # 4 independent CAJAL runs: one per (frame, modality)
+│       ├── main.py                    # one CAJAL run per modality, pooling both frames together
 │       ├── config.py                  # conditions, frames, sample size per condition, paths
 │       ├── select_cells.py            # flat per-(frame, condition) sampling, no budget-splitting
 │       ├── slurm_submit.sh

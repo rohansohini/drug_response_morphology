@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.density_plots import plot_embedding_with_kde, export_kde_by_frame, export_kde, plot_embedding_with_weighted_kde
+from shared.density_plots import plot_embedding_with_kde, export_kde_by_frame, plot_embedding_with_weighted_kde
 
 
 def test_legend_shows_well_sampled_groups_only():
@@ -95,31 +95,6 @@ def test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame(tmp_dir='/tmp/clau
 
     shutil.rmtree(tmp_dir)
     print("PASS: export_kde_by_frame writes a flat PDF, with only SVGs in their own subfolder")
-
-
-def test_export_kde_writes_a_single_flat_pdf_and_svg():
-    tmp_dir = '/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_kde_test'
-    import shutil
-    if os.path.exists(tmp_dir):
-        shutil.rmtree(tmp_dir)
-
-    rng = np.random.default_rng(0)
-    df = pd.DataFrame({
-        'dim_0': rng.normal(0, 1, 60), 'dim_1': rng.normal(0, 1, 60),
-        'condition': ['naive'] * 30 + ['vem_1uM'] * 30,
-    })
-
-    export_kde(df, 'condition', {'naive': 'tab:blue', 'vem_1uM': 'tab:red'}, tmp_dir, 'cell_frame01_umap', 'UMAP')
-
-    svg_dir = os.path.join(tmp_dir, 'svgs')
-    assert set(os.listdir(tmp_dir)) == {'cell_frame01_umap.pdf', 'svgs'}, \
-        f"expected cell_frame01_umap.pdf and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
-    assert os.listdir(svg_dir) == ['cell_frame01_umap.svg']
-    assert os.path.getsize(os.path.join(tmp_dir, 'cell_frame01_umap.pdf')) > 0
-    assert os.path.getsize(os.path.join(svg_dir, 'cell_frame01_umap.svg')) > 0
-
-    shutil.rmtree(tmp_dir)
-    print("PASS: export_kde writes a single flat PDF + one SVG in its own subfolder")
 
 
 def test_kde_contours_are_unfilled_outlines_at_default_levels():
@@ -322,7 +297,6 @@ def test_weighted_kde_legend_shows_total_weight():
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame()
-    test_export_kde_writes_a_single_flat_pdf_and_svg()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_embedding_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()

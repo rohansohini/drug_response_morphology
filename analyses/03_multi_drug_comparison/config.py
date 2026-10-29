@@ -8,16 +8,16 @@ import os
 CONDITIONS = ['naive', 'vem_1uM', 'gem_2.5nM', 'tram_6nM']
 
 ###### Frames
-#  Compares conditions at two INDEPENDENT timepoints, each with its own
-#  CAJAL run (not one shared embedding across frames like naive_vs_vem) -
-#  frame 1's embedding space has no relationship to frame 13's, since
-#  the question here is how conditions differ WITHIN a frame, never how
-#  a frame differs from another frame. Frame 13 is the LAST frame any
-#  condition's metadata.csv can contain: process_imaging_data's own
-#  main.py already excludes anything beyond its MAX_FRAME (see
-#  process_imaging_data/config.py - frames beyond that are unreliable,
-#  heavy overcrowding) before this analysis ever sees the data, so
-#  there's no separate "end frame" cutoff to maintain here too.
+#  Compares conditions at two timepoints that share ONE embedding space
+#  (one CAJAL run per modality, pooling both frames' cells together - see
+#  main.py) rather than one independent run per frame, so frame 1 and
+#  frame 13 positions are directly comparable, not just visually similar.
+#  Frame 13 is the LAST frame any condition's metadata.csv can contain:
+#  process_imaging_data's own main.py already excludes anything beyond
+#  its MAX_FRAME (see process_imaging_data/config.py - frames beyond
+#  that are unreliable, heavy overcrowding) before this analysis ever
+#  sees the data, so there's no separate "end frame" cutoff to maintain
+#  here too.
 FRAMES = [1, 13]
 
 ###### Sampling
@@ -49,20 +49,6 @@ def metadata_csv_path(condition: str) -> str:
     return os.path.join(PROCESSED_DATA_DIR, f'{condition}_metadata.csv')
 
 
-def frame_masks_dir(frame: int) -> str:
-    '''
-    Each frame's own masks/ subfolder - frame 1 and frame 13's masks
-    never share a folder, since CAJAL treats everything in one folder as
-    one shape space and these two frames must stay independent (see main.py).
-    '''
-    return os.path.join(MASKS_DIR, f'frame_{frame:02d}')
-
-
-def frame_cajal_dir(frame: int) -> str:
-    '''Each frame's own cajal_output/ subfolder - see frame_masks_dir.'''
-    return os.path.join(CAJAL_OUTPUT_DIR, f'frame_{frame:02d}')
-
-
 ###### Mask extraction / CAJAL parameters
 PAD_SIZE   = 200   # pixels of zero-padding added to each side of extracted masks
 N_JOBS     = 52    # parallel jobs for mask extraction / CAJAL - must match slurm_submit.sh's --cpus-per-task
@@ -70,6 +56,8 @@ N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 20    # clusters for quantized GW
 
 ###### Embedding parameters
-#  Both fit directly on each frame's own CAJAL GW distance matrix.
+#  Both fit directly on the CAJAL GW distance matrix (precomputed), which
+#  pools every condition AND both frames together - one shared space, not
+#  a separate fit per frame.
 UMAP_SEED  = 42
 PHATE_SEED = 42
