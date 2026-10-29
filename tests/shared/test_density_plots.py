@@ -59,7 +59,7 @@ def _pdf_page_count(path):
     return len(re.findall(rb'/Type\s*/Page\b', data))
 
 
-def test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
+def test_export_kde_by_frame_writes_pdf_tiff_and_one_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
     import shutil
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -74,25 +74,32 @@ def test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame(tmp_d
     df = pd.DataFrame(rows)
 
     export_kde_by_frame(df, 'condition', {'naive': 'tab:blue', 'A1_1uM_vem': 'tab:red'},
-                         tmp_dir, 'cell', 'UMAP')
+                         tmp_dir, 'cell_umap', 'UMAP')
 
-    pdf_dir = os.path.join(tmp_dir, 'pdfs')
     svg_dir = os.path.join(tmp_dir, 'svgs')
-    expected_svgs = {f'cell_frame_0{f}.svg' for f in [1, 2, 3]}
+    expected_svgs = {f'cell_umap_frame_0{f}.svg' for f in [1, 2, 3]}
 
-    assert set(os.listdir(pdf_dir)) == {'cell.pdf'}, \
-        f"expected a single combined PDF, got {os.listdir(pdf_dir)}"
+    # PDF and TIFF sit directly in tmp_dir (no pdfs/ or tiffs/ subfolder) -
+    # only the SVGs, since there are many, get their own subfolder
+    assert set(os.listdir(tmp_dir)) == {'cell_umap.pdf', 'cell_umap.tiff', 'svgs'}, \
+        f"expected cell_umap.pdf, cell_umap.tiff, and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
     assert set(os.listdir(svg_dir)) == expected_svgs, f"got {os.listdir(svg_dir)}"
 
-    pdf_path = os.path.join(pdf_dir, 'cell.pdf')
-    assert os.path.getsize(pdf_path) > 0, "cell.pdf is empty"
+    pdf_path  = os.path.join(tmp_dir, 'cell_umap.pdf')
+    tiff_path = os.path.join(tmp_dir, 'cell_umap.tiff')
+    assert os.path.getsize(pdf_path) > 0, "cell_umap.pdf is empty"
     assert _pdf_page_count(pdf_path) == 3, \
         f"expected 3 pages (one per frame) in the combined PDF, got {_pdf_page_count(pdf_path)}"
+
+    import tifffile
+    stack = tifffile.imread(tiff_path)
+    assert stack.shape[0] == 3, f"expected 3 stacked pages (one per frame) in the TIFF, got {stack.shape[0]}"
+
     for f in expected_svgs:
         assert os.path.getsize(os.path.join(svg_dir, f)) > 0, f"{f} is empty"
 
     shutil.rmtree(tmp_dir)
-    print("PASS: export_kde_by_frame writes one combined multi-page PDF and one SVG per frame")
+    print("PASS: export_kde_by_frame writes a flat PDF + stacked TIFF, with only SVGs in their own subfolder")
 
 
 def test_kde_contours_are_unfilled_outlines_at_default_levels():
@@ -294,7 +301,7 @@ def test_weighted_kde_legend_shows_total_weight():
 
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
-    test_export_kde_by_frame_writes_one_combined_pdf_and_one_svg_per_frame()
+    test_export_kde_by_frame_writes_pdf_tiff_and_one_svg_per_frame()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_embedding_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()

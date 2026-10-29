@@ -1,5 +1,7 @@
 import os
 
+import numpy as np
+import tifffile
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
@@ -125,47 +127,69 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
     ax.legend(handles=legend_handles, fontsize=8)
 
 
+def _rasterize(fig, dpi=150):
+    '''
+    Render a figure to a fixed-size RGB array, for stacking into a
+    multi-page TIFF. Uses the figure's own nominal size (not a
+    bbox_inches='tight' crop, which savefig applies separately for the
+    PDF/SVG) so every frame comes out the exact same pixel shape - a
+    varying crop (e.g. from a longer legend label on one frame) would
+    otherwise make np.stack raise on a shape mismatch, and a video needs
+    consistent framing anyway.
+    '''
+    fig.set_dpi(dpi)
+    fig.canvas.draw()
+    return np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
+
+
 def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5):
     '''
-    One combined, multi-page PDF (one page per frame present in df), plus
-    one SVG per frame, each a plot_embedding_with_kde call restricted to
-    that frame's cells. PDF is saved to output_dir/pdfs/{file_prefix}.pdf;
-    SVGs to output_dir/svgs/{file_prefix}_frame_NN.svg - SVG has no
-    multi-page format, so it stays one file per frame while the PDF is
-    combined into a single file. Shared by every analysis notebook - they
-    differ only in which df/group_col/colors/output_dir they pass in, and
-    (now) which embedding's coordinates df holds.
+    One combined, multi-page PDF, one stacked multi-page TIFF (one page
+    per frame, for turning into a video later), and one SVG per frame (in
+    their own svgs/ subfolder, since there are many of those but only
+    one PDF and one TIFF) - each page a plot_embedding_with_kde call
+    restricted to that frame's cells. Shared by every analysis notebook -
+    they differ only in which df/group_col/colors/output_dir they pass
+    in, and which embedding's coordinates df holds.
 
-    Every page shares the same, fixed axis limits - computed once from
-    every frame's cells in df together, padded 5% on each side - rather
-    than each page auto-scaling to just its own frame's data range. Without
-    this, two pages can independently end up with very similar axis
-    ranges whenever their data happens to span a similar extent, making
-    two actually-different points land in very similar relative screen
-    positions purely from the auto-scaling, not because the underlying
-    data matches - fixed axes remove that ambiguity and make frames
-    directly visually comparable besides.
+    output_dir/{file_prefix}.pdf
+    output_dir/{file_prefix}.tiff
+    output_dir/svgs/{file_prefix}_frame_NN.svg
+
+    Every page shares the same, fixed axis limits, computed once from
+    every frame's cells in df together and padded 5% on each side,
+    rather than each page auto-scaling to just its own frame's data
+    range. Without this, two pages can independently end up with very
+    similar axis ranges whenever their data happens to span a similar
+    extent, making two actually different points land in very similar
+    relative screen positions purely from the auto-scaling, not because
+    the underlying data matches. Fixed axes remove that ambiguity and
+    make frames directly visually comparable besides.
 
     Inputs:
         df:              must have: frame, dim_0, dim_1, group_col
         group_col:       column to contour per (e.g. 'condition' or 'subclass')
         group_colors:    {group_value: color}
-        output_dir:      directory to create pdfs/ and svgs/ subfolders in
-        file_prefix:     filename prefix (e.g. 'cell' -> 'cell.pdf', 'cell_frame_01.svg')
-        embedding_label: see plot_embedding_with_kde - purely cosmetic
+        output_dir:      directory to save into (and create a svgs/ subfolder in)
+        file_prefix:     filename prefix (e.g. 'cell_umap' -> 'cell_umap.pdf', 'cell_umap_frame_01.svg')
+        embedding_label: see plot_embedding_with_kde, purely cosmetic
                          (axis labels only, e.g. 'UMAP' or 'PHATE')
         title_prefix:    prefix for each plot's title (defaults to file_prefix if not given)
         min_group_size:  passed through to plot_embedding_with_kde
     '''
     title_prefix = file_prefix if title_prefix is None else title_prefix
 
-    frames  = sorted(df['frame'].unique())
-    pdf_dir = os.path.join(output_dir, 'pdfs')
+    frames = sorted(df['frame'].unique())
+    assert len(frames) > 0, (
+        f"df has no rows at all for '{file_prefix}' - check whatever filtering produced it "
+        f"(e.g. a condition/subclass name that no longer matches the real data)"
+    )
     svg_dir = os.path.join(output_dir, 'svgs')
-    os.makedirs(pdf_dir, exist_ok=True)
+    os.makedirs(output_dir, exist_ok=True)
     os.makedirs(svg_dir, exist_ok=True)
 
-    pdf_path = os.path.join(pdf_dir, f'{file_prefix}.pdf')
+    pdf_path  = os.path.join(output_dir, f'{file_prefix}.pdf')
+    tiff_path = os.path.join(output_dir, f'{file_prefix}.tiff')
 
     x_min, x_max = df['dim_0'].min(), df['dim_0'].max()
     y_min, y_max = df['dim_1'].min(), df['dim_1'].max()
@@ -174,17 +198,21 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     xlim  = (x_min - x_pad, x_max + x_pad)
     ylim  = (y_min - y_pad, y_max + y_pad)
 
+    frame_images = []
     with PdfPages(pdf_path) as pdf:
         for frame in frames:
             subset = df[df['frame'] == frame]
             fig, ax = plt.subplots(figsize=(6, 6))
             plot_embedding_with_kde(
                 subset, group_col, group_colors, ax,
-                f'{title_prefix} - frame {frame}', embedding_label, min_group_size=min_group_size,
+                f'{title_prefix}: frame {frame}', embedding_label, min_group_size=min_group_size,
                 xlim=xlim, ylim=ylim,
             )
             pdf.savefig(fig, bbox_inches='tight')
             fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
+            frame_images.append(_rasterize(fig))
             plt.close(fig)
 
-    print(f"  Saved {len(frames)} frame(s) to {pdf_path} and {svg_dir}")
+    tifffile.imwrite(tiff_path, np.stack(frame_images), photometric='rgb')
+
+    print(f"  Saved {len(frames)} frame(s) to {pdf_path}, {tiff_path}, and {svg_dir}")
