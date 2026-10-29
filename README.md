@@ -82,7 +82,6 @@ output/
 └── plots/
     └── {notebook_name}/
         ├── {modality}_{embedding}.pdf   # one combined, multi-page PDF, e.g. cell_umap.pdf
-        ├── {modality}_{embedding}.tiff  # the same pages, stacked into one TIFF for making a video
         └── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
 ```
 

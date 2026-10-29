@@ -1,7 +1,5 @@
 import os
 
-import numpy as np
-import tifffile
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
@@ -9,7 +7,7 @@ from IPython.display import display
 import seaborn as sns
 
 
-def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2, xlim=None, ylim=None):
+def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1, xlim=None, ylim=None):
     '''
     Scatter every cell in df (light grey background), then overlay a KDE
     contour per group in group_col. Works on any 2D embedding (UMAP,
@@ -74,7 +72,7 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
     ax.legend(handles=legend_handles, fontsize=8)
 
 
-def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2, xlim=None, ylim=None):
+def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.7, 0.8, 0.9), bw_adjust=1, xlim=None, ylim=None):
     '''
     Like plot_embedding_with_kde, but for cells with a MIXTURE of group
     membership instead of one hard label - e.g. each cell has its own
@@ -132,33 +130,16 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
     ax.legend(handles=legend_handles, fontsize=8)
 
 
-def _rasterize(fig, dpi=150):
+def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1):
     '''
-    Render a figure to a fixed-size RGB array, for stacking into a
-    multi-page TIFF. Uses the figure's own nominal size (not a
-    bbox_inches='tight' crop, which savefig applies separately for the
-    PDF/SVG) so every frame comes out the exact same pixel shape - a
-    varying crop (e.g. from a longer legend label on one frame) would
-    otherwise make np.stack raise on a shape mismatch, and a video needs
-    consistent framing anyway.
-    '''
-    fig.set_dpi(dpi)
-    fig.canvas.draw()
-    return np.asarray(fig.canvas.buffer_rgba())[:, :, :3]
-
-
-def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1.2):
-    '''
-    One combined, multi-page PDF, one stacked multi-page TIFF (one page
-    per frame, for turning into a video later), and one SVG per frame (in
-    their own svgs/ subfolder, since there are many of those but only
-    one PDF and one TIFF) - each page a plot_embedding_with_kde call
-    restricted to that frame's cells. Shared by every analysis notebook -
-    they differ only in which df/group_col/colors/output_dir they pass
-    in, and which embedding's coordinates df holds.
+    One combined, multi-page PDF and one SVG per frame (in their own
+    svgs/ subfolder, since there are many of those but only one PDF) -
+    each page a plot_embedding_with_kde call restricted to that frame's
+    cells. Shared by every analysis notebook - they differ only in which
+    df/group_col/colors/output_dir they pass in, and which embedding's
+    coordinates df holds.
 
     output_dir/{file_prefix}.pdf
-    output_dir/{file_prefix}.tiff
     output_dir/svgs/{file_prefix}_frame_NN.svg
 
     Also displays each frame's figure directly in the notebook's output
@@ -199,8 +180,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(svg_dir, exist_ok=True)
 
-    pdf_path  = os.path.join(output_dir, f'{file_prefix}.pdf')
-    tiff_path = os.path.join(output_dir, f'{file_prefix}.tiff')
+    pdf_path = os.path.join(output_dir, f'{file_prefix}.pdf')
 
     x_min, x_max = df['dim_0'].min(), df['dim_0'].max()
     y_min, y_max = df['dim_1'].min(), df['dim_1'].max()
@@ -209,7 +189,6 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     xlim  = (x_min - x_pad, x_max + x_pad)
     ylim  = (y_min - y_pad, y_max + y_pad)
 
-    frame_images = []
     with PdfPages(pdf_path) as pdf:
         for frame in frames:
             subset = df[df['frame'] == frame]
@@ -221,10 +200,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
             )
             pdf.savefig(fig, bbox_inches='tight')
             fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
-            frame_images.append(_rasterize(fig))
             display(fig)   # show it in the notebook's own output, not just save it to disk
             plt.close(fig)
 
-    tifffile.imwrite(tiff_path, np.stack(frame_images), photometric='rgb')
-
-    print(f"  Saved {len(frames)} frame(s) to {pdf_path}, {tiff_path}, and {svg_dir}")
+    print(f"  Saved {len(frames)} frame(s) to {pdf_path} and {svg_dir}")
