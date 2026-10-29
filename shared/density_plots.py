@@ -6,7 +6,7 @@ from matplotlib.lines import Line2D
 import seaborn as sns
 
 
-def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.7, 0.8, 0.9), xlim=None, ylim=None):
+def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_label, min_group_size=5, levels=(0.3, 0.5, 0.7), xlim=None, ylim=None):
     '''
     Scatter every cell in df (light grey background), then overlay a KDE
     contour per group in group_col. Works on any 2D embedding (UMAP,
@@ -51,6 +51,9 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
         sns.kdeplot(
             x=subset['dim_0'], y=subset['dim_1'], ax=ax,
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
+            bw_adjust=1.2,  # smooth over sampling/distance-tie noise a bit, since we're
+                            # now contouring tight around the peak (see levels above) -
+                            # a noisy, under-smoothed KDE shows more spurious bumps there
         )
         legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5, label=f'{group} (n={len(subset)})'))
 
@@ -64,7 +67,7 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
     ax.legend(handles=legend_handles, fontsize=8)
 
 
-def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.5, 0.7, 0.9), xlim=None, ylim=None):
+def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, embedding_label, min_total_weight=5, levels=(0.3, 0.5, 0.7), xlim=None, ylim=None):
     '''
     Like plot_embedding_with_kde, but for cells with a MIXTURE of group
     membership instead of one hard label - e.g. each cell has its own
@@ -107,6 +110,7 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
         sns.kdeplot(
             x=df['dim_0'], y=df['dim_1'], weights=weights, ax=ax,
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
+            bw_adjust=1.2,  # see plot_embedding_with_kde
         )
         legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5,
                                       label=f'{group} (total weight={total_weight:.1f})'))
