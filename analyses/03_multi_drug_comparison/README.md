@@ -4,7 +4,8 @@ Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`,
 
 1. **Samples up to `config.SAMPLE_SIZE_PER_CONDITION`** (default 1000) `has_mask=True` cells per (frame, condition) - a flat per-bucket size, not a budget split by weight like `naive_vs_vem`, so no water-filling is needed (`select_cells.py`).
 2. **Runs CAJAL 4 times total**: once per (frame, modality) - frame 1 cell, frame 1 nucleus, frame 13 cell, frame 13 nucleus - each in its own `output/masks/frame_NN/` and `output/cajal_output/frame_NN/` subfolder (`config.frame_masks_dir`/`frame_cajal_dir`), then fits UMAP and PHATE on each.
-3. **`01_kde_by_condition.ipynb`** produces one KDE-contour-per-condition plot for every (frame, modality, embedding method) combination - 2 frames × 2 modalities × 2 embedding methods = 8 plots total, each a standalone figure (no paging across frames, since there's no shared embedding to page through).
+3. **`00_representative_shapes.ipynb`** k-means clusters each frame's full embedding (pooled across every condition) into a few regions and shows each region's actual representative cell shape - same pattern as `01_naive_vs_vem`'s and `02_vem_48hr_pretreatment`'s own `00_representative_shapes.ipynb`, run once per (frame, modality, embedding method).
+4. **`01_kde_by_condition.ipynb`** produces one KDE-contour-per-condition plot for every (frame, modality, embedding method) combination - 2 frames × 2 modalities × 2 embedding methods = 8 plots total, each a standalone figure (no paging across frames, since there's no shared embedding to page through).
 
 ---
 
