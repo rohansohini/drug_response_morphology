@@ -131,7 +131,7 @@ def pick_representative_shapes(df, masks_dir, modality, n_regions, half_width=15
     return df, pd.DataFrame(rows)
 
 
-def plot_representative_shapes(df, shapes, embedding_label, title, xlim=None, ylim=None):
+def plot_representative_shapes(df, shapes, embedding_label, title):
     '''
     One figure: a scatter of df's embedding colored by region (with each
     region's centroid marked), next to a row of that region's actual
@@ -143,13 +143,6 @@ def plot_representative_shapes(df, shapes, embedding_label, title, xlim=None, yl
         shapes:          from pick_representative_shapes
         embedding_label: axis label text only, e.g. 'UMAP' or 'PHATE'
         title:           figure title
-        xlim, ylim:      (min, max) tuples to fix the scatter axes to, or
-                         None to auto-scale to this call's own data - set
-                         these when df is only a SUBSET of a larger shared
-                         embedding (e.g. one frame's cells out of a space
-                         that also covers other frames), so the subset's
-                         own auto-scaled extent doesn't make it look like
-                         a different, unrelated space
     Outputs:
         fig: caller saves/closes this
     '''
@@ -172,10 +165,6 @@ def plot_representative_shapes(df, shapes, embedding_label, title, xlim=None, yl
     scatter_ax.set_title(title)
     scatter_ax.set_xlabel(f'{embedding_label} 1')
     scatter_ax.set_ylabel(f'{embedding_label} 2')
-    if xlim is not None:
-        scatter_ax.set_xlim(xlim)
-    if ylim is not None:
-        scatter_ax.set_ylim(ylim)
     scatter_ax.legend(fontsize=8)
 
     for ax, (_, shape_row) in zip(shape_axes, shapes.iterrows()):
@@ -192,7 +181,7 @@ def plot_representative_shapes(df, shapes, embedding_label, title, xlim=None, yl
     return fig
 
 
-def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_label, title, output_dir, file_prefix, half_width=150, seed=42, xlim=None, ylim=None):
+def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_label, title, output_dir, file_prefix, half_width=150, seed=42):
     '''
     Full pipeline: cluster, pick each region's representative shape, plot,
     and save. See pick_representative_shapes and plot_representative_shapes.
@@ -203,14 +192,11 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     Also displays the figure directly in the notebook's output, so you
     don't have to open the saved files just to see it.
 
-    Inputs:
-        xlim, ylim: see plot_representative_shapes - set these when df is
-                    only a subset of a larger shared embedding
     Outputs:
         df: from pick_representative_shapes, for notebook inspection
     '''
     df, shapes = pick_representative_shapes(df, masks_dir, modality, n_regions, half_width, seed)
-    fig = plot_representative_shapes(df, shapes, embedding_label, title, xlim=xlim, ylim=ylim)
+    fig = plot_representative_shapes(df, shapes, embedding_label, title)
 
     svg_dir = os.path.join(output_dir, 'svgs')
     os.makedirs(svg_dir, exist_ok=True)
