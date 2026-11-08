@@ -60,7 +60,7 @@ drug_response_morphology/
 │   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
-│   │   ├── notebooks/                 # the 4 notebooks (see analyses/01_naive_vs_vem/README.md)
+│   │   ├── notebooks/                 # the 6 notebooks (see analyses/01_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
 │   ├── 02_vem_48hr_pretreatment/
 │   │   ├── README.md
