@@ -132,3 +132,34 @@ def load_full_dataset(cajal_output_dir: str, modality: str, embedding_method: st
     data = np.load(embedding_path, allow_pickle=True)
 
     return build_dataset(list(data['labels']), data['embedding'], selected)
+
+
+def export_plot_data(dfs: dict, output_path: str) -> pd.DataFrame:
+    '''
+    Combine every (modality, embedding_method) DataFrame a notebook's own
+    process_modality()-style loop already built into one flat CSV, so
+    someone without this repo can recreate (or extend) its plots from raw
+    per-cell coordinates and metadata alone, no code required.
+
+    Inputs:
+        dfs:         {(modality, embedding_method): df} - each df must
+                      already have everything a plot needs (dim_0, dim_1
+                      from load_full_dataset, plus whatever grouping/
+                      metadata columns this notebook added - condition,
+                      subclass, frame, region, ...)
+        output_path: where to save the combined CSV
+    Outputs:
+        combined: the saved DataFrame, for notebook inspection
+    '''
+    parts = []
+    for (modality, embedding_method), df in dfs.items():
+        part = df.copy()
+        part.insert(0, 'embedding_method', embedding_method)
+        part.insert(0, 'modality', modality)
+        parts.append(part)
+    combined = pd.concat(parts, ignore_index=True)
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    combined.to_csv(output_path, index=False)
+    print(f"  Saved plot data ({len(combined)} rows) to {output_path}")
+    return combined

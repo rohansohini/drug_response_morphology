@@ -52,7 +52,7 @@ drug_response_morphology/
 │   │   ├── run_cajal.py               # CAJAL icdm + quantized GW distances
 │   │   └── embed.py                   # loads the distance matrix; UMAP/PHATE on it
 │   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
-│   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
+│   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata; exports a notebook's combined plot_data.csv
 │   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 │   ├── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
 │   ├── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
@@ -109,8 +109,11 @@ output/
 └── plots/
     └── {notebook_name}/
         ├── {modality}_{embedding}.pdf   # one combined, multi-page PDF, e.g. cell_umap.pdf
-        └── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
+        ├── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
+        └── plot_data.csv                # the same data each plot above is drawn from
 ```
+
+Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). `vem_48hr_pretreatment`'s permutation-test notebook instead exports one row per permutation, per modality: `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality).
 
 ---
 
@@ -119,7 +122,7 @@ output/
 1. `mkdir -p analyses/<name>/notebooks`
 2. Write `analyses/<name>/config.py`: at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions, frames, sampling).
 3. Write `analyses/<name>/main.py`, reusing `shared.cajal.extract_masks/run_cajal/embed` directly. Only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `01_naive_vs_vem/select_cells.py` for budget-based sampling, or `02_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
-4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom). Copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each with the embedding method as a filename suffix (see any existing notebook's cell 3): follow that same pattern rather than picking just one.
+4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom). Copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each with the embedding method as a filename suffix (see any existing notebook's cell 3): follow that same pattern rather than picking just one. End with `shared.load_data.export_plot_data` on the `{embedding_method: df}` dict(s) `process_modality()` already built, saved to `NOTEBOOK_PLOTS_DIR/plot_data.csv` - see any existing notebook's last cell.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
 6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together. See any existing analysis's README for the expected level of detail.
 

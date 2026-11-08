@@ -4,11 +4,14 @@ Run directly: python3 tests/shared/test_load_data.py
 import os
 import sys
 
+import shutil
+import tempfile
+
 import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.load_data import parse_label, build_dataset, match_labels_to_metadata
+from shared.load_data import parse_label, build_dataset, match_labels_to_metadata, export_plot_data
 
 
 def test_parse_label_handles_underscores_in_condition_name():
@@ -123,6 +126,43 @@ def test_match_labels_to_metadata_carries_through_every_selected_column():
     print("PASS: match_labels_to_metadata carries through every column `selected` has, not just a hardcoded subset")
 
 
+def test_export_plot_data_adds_modality_and_embedding_method_columns():
+    dfs = {
+        ('cell', 'umap'): pd.DataFrame({'dim_0': [0.1], 'dim_1': [0.2], 'condition': ['naive']}),
+        ('cell', 'phate'): pd.DataFrame({'dim_0': [0.3], 'dim_1': [0.4], 'condition': ['vem_1uM']}),
+        ('nuc', 'umap'): pd.DataFrame({'dim_0': [0.5], 'dim_1': [0.6], 'condition': ['naive']}),
+    }
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        output_path = os.path.join(tmpdir, 'plot_data.csv')
+        combined = export_plot_data(dfs, output_path)
+
+        assert len(combined) == 3
+        assert set(combined['modality']) == {'cell', 'nuc'}
+        assert set(combined['embedding_method']) == {'umap', 'phate'}
+
+        on_disk = pd.read_csv(output_path)
+        assert len(on_disk) == 3
+        assert list(on_disk.columns[:2]) == ['modality', 'embedding_method']
+        print("PASS: export_plot_data combines every (modality, embedding_method) df with those columns added, and saves to disk")
+    finally:
+        shutil.rmtree(tmpdir)
+
+
+def test_export_plot_data_creates_missing_output_directory():
+    dfs = {('cell', 'umap'): pd.DataFrame({'dim_0': [0.1], 'dim_1': [0.2]})}
+
+    tmpdir = tempfile.mkdtemp()
+    try:
+        output_path = os.path.join(tmpdir, 'nested', 'dir', 'plot_data.csv')
+        export_plot_data(dfs, output_path)
+        assert os.path.exists(output_path)
+        print("PASS: export_plot_data creates a missing output directory rather than erroring")
+    finally:
+        shutil.rmtree(tmpdir)
+
+
 if __name__ == '__main__':
     test_parse_label_handles_underscores_in_condition_name()
     test_build_dataset_merges_correctly()
@@ -130,4 +170,6 @@ if __name__ == '__main__':
     test_build_dataset_raises_on_duplicate_metadata_key()
     test_match_labels_to_metadata_works_without_a_subclass_column()
     test_match_labels_to_metadata_carries_through_every_selected_column()
+    test_export_plot_data_adds_modality_and_embedding_method_columns()
+    test_export_plot_data_creates_missing_output_directory()
     print("\nAll tests passed.")
