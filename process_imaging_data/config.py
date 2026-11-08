@@ -49,4 +49,11 @@ COMBINED_MASKS_DIR = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 N_JOBS    = 16
 BUFFER    = 2
 IMG_SIZE  = 2501
-MAX_FRAME = 13   # frames beyond this are unreliable (heavy overcrowding) and excluded entirely
+
+# No frame cutoff here - every available raw frame is processed for
+# every condition. Frames beyond ~13 are known to get unreliable (heavy
+# overcrowding from repeated division), but which frames are actually
+# trustworthy enough to use is a judgment call specific to what each
+# downstream analysis is asking - so each analysis's own config decides
+# its own frame range explicitly, rather than this shared pipeline
+# silently excluding data every analysis might not want excluded.

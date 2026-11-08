@@ -12,12 +12,12 @@ CONDITIONS = ['naive', 'vem_1uM', 'gem_2.5nM', 'tram_6nM']
 #  (one CAJAL run per modality, pooling both frames' cells together - see
 #  main.py) rather than one independent run per frame, so frame 1 and
 #  frame 13 positions are directly comparable, not just visually similar.
-#  Frame 13 is the LAST frame any condition's metadata.csv can contain:
-#  process_imaging_data's own main.py already excludes anything beyond
-#  its MAX_FRAME (see process_imaging_data/config.py - frames beyond
-#  that are unreliable, heavy overcrowding) before this analysis ever
-#  sees the data, so there's no separate "end frame" cutoff to maintain
-#  here too.
+#  process_imaging_data itself no longer caps frames (see its own
+#  config.py) - {drug}_metadata.csv can now contain far more of them -
+#  so frame 13 here is this analysis's own deliberate choice (frames
+#  beyond that are known to get unreliable, heavy overcrowding from
+#  repeated division), explicitly capped rather than silently absorbing
+#  whatever else becomes available upstream.
 FRAMES = [1, 13]
 
 ###### Sampling

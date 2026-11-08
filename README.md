@@ -28,6 +28,10 @@ Asks whether a cell's shape *before* vemurafenib treatment predicts what it even
 
 Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`, `gem_2.5nM`, `tram_6nM`) at two timepoints, sharing one CAJAL embedding per modality across both.
 
+### [`vem_full_timecourse`](analyses/04_vem_full_timecourse/README.md)
+
+Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
+
 ---
 
 ## Directory structure
@@ -51,13 +55,13 @@ drug_response_morphology/
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata
 │   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 │   ├── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
-│   └── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
+│   ├── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
+│   └── allocation.py                  # water-filling budget allocation
 ├── analyses/
 │   ├── 01_naive_vs_vem/
 │   │   ├── README.md
 │   │   ├── main.py                    # runs the pipeline end to end
 │   │   ├── config.py                  # conditions, sampling budget, paths
-│   │   ├── allocation.py              # water-filling budget allocation
 │   │   ├── select_cells.py            # cell selection/sampling
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/                 # the 6 notebooks (see analyses/01_naive_vs_vem/README.md)
@@ -71,11 +75,19 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
-│   └── 03_multi_drug_comparison/
+│   ├── 03_multi_drug_comparison/
+│   │   ├── README.md
+│   │   ├── main.py                    # one CAJAL run per modality, pooling both frames together
+│   │   ├── config.py                  # conditions, frames, sample size per condition, paths
+│   │   ├── select_cells.py            # flat per-(frame, condition) sampling, no budget-splitting
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored)
+│   └── 04_vem_full_timecourse/
 │       ├── README.md
-│       ├── main.py                    # one CAJAL run per modality, pooling both frames together
-│       ├── config.py                  # conditions, frames, sample size per condition, paths
-│       ├── select_cells.py            # flat per-(frame, condition) sampling, no budget-splitting
+│       ├── main.py                    # single-condition CAJAL run, every available frame
+│       ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
+│       ├── select_cells.py            # single-condition water-filled sampling, no frame cap
 │       ├── slurm_submit.sh
 │       ├── notebooks/
 │       └── output/                    # generated (gitignored)
@@ -85,7 +97,8 @@ drug_response_morphology/
 │   └── analyses/
 │       ├── 01_naive_vs_vem/
 │       ├── 02_vem_48hr_pretreatment/
-│       └── 03_multi_drug_comparison/
+│       ├── 03_multi_drug_comparison/
+│       └── 04_vem_full_timecourse/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 

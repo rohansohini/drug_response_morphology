@@ -3,7 +3,7 @@ import pandas as pd
 
 import config
 from shared.classify import classify_subclass
-from allocation import water_fill_allocate
+from shared.allocation import water_fill_allocate
 
 
 def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame:
@@ -11,9 +11,14 @@ def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame
     Select which cells go through CAJAL, from each condition's full metadata.
 
     Restricted to has_mask=True rows (only real segmented cells can go
-    through mask extraction/CAJAL) and to frames present in EVERY
-    condition (a cell at a frame only one condition has can't be compared
-    across conditions, which is the whole point of this dataset).
+    through mask extraction/CAJAL), to frames present in EVERY condition
+    (a cell at a frame only one condition has can't be compared across
+    conditions, which is the whole point of this dataset), and to frames
+    <= config.MAX_FRAME (process_imaging_data itself no longer caps
+    frames - every condition's metadata.csv can now have far more of
+    them than this analysis has ever used, so this analysis caps its own
+    frame range explicitly instead of silently absorbing whatever's
+    newly available upstream).
 
     config.TOTAL_CELL_BUDGET is split across conditions by
     config.CONDITION_WEIGHTS, then water-filled (see pipeline/allocation.py)
@@ -35,8 +40,11 @@ def select_cells(metadata_by_condition: dict[str, pd.DataFrame]) -> pd.DataFrame
     for df in metadata_by_condition.values():
         frames = set(df['frame'].unique())
         overlapping_frames = frames if overlapping_frames is None else overlapping_frames & frames
+    overlapping_frames = {f for f in overlapping_frames if f <= config.MAX_FRAME}
 
-    assert overlapping_frames, "no frame numbers are shared across every condition - nothing to sample"
+    assert overlapping_frames, (
+        "no frame numbers <= config.MAX_FRAME are shared across every condition - nothing to sample"
+    )
 
     weight_sum = sum(config.CONDITION_WEIGHTS.values())
     assert abs(weight_sum - 1.0) < 1e-6, f"config.CONDITION_WEIGHTS must sum to 1.0, got {weight_sum}"

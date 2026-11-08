@@ -2,7 +2,7 @@
 
 Compares cell and nuclear morphology between the `naive` and `vem_1uM` conditions over time.
 
-1. **Selects cells** for CAJAL from both conditions, every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and sampled with an 80/20 vem/naive budget split (`select_cells.py` / `allocation.py`).
+1. **Selects cells** for CAJAL from both conditions, every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and <= `config.MAX_FRAME` (13 - `process_imaging_data` itself no longer caps frames, so this analysis caps its own range explicitly rather than silently absorbing whatever else becomes available upstream), sampled with an 80/20 vem/naive budget split (`select_cells.py` / `shared/allocation.py`).
 2. **Runs CAJAL** once per modality (cell, nucleus) on the combined selection.
 3. **Fits UMAP and PHATE directly on the CAJAL distance matrix** (`metric='precomputed'`/`knn_dist='precomputed_distance'`).
 4. **Six notebooks** read those shared embeddings:
@@ -17,7 +17,7 @@ Compares cell and nuclear morphology between the `naive` and `vem_1uM` condition
 
 ## Configuration
 
-`config.py` sets the two condition names (`NAIVE_CONDITION`, `VEM_CONDITION`, which must exactly match `process_imaging_data`'s own condition naming), the total CAJAL sampling budget and its per-condition weights, the classification scheme (see the root README's "Classification scheme" section), and `PROCESS_IMAGING_DATA_ROOT`.
+`config.py` sets the two condition names (`NAIVE_CONDITION`, `VEM_CONDITION`, which must exactly match `process_imaging_data`'s own condition naming), the total CAJAL sampling budget and its per-condition weights, `MAX_FRAME` (this analysis's own frame cutoff), the classification scheme (see the root README's "Classification scheme" section), and `PROCESS_IMAGING_DATA_ROOT`.
 
 ---
 

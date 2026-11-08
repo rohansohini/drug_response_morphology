@@ -1,12 +1,11 @@
 '''
-Run directly: python3 tests/analyses/01_naive_vs_vem/test_allocation.py
+Run directly: python3 tests/shared/test_allocation.py
 '''
 import os
 import sys
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '01_naive_vs_vem')
-sys.path.insert(0, ANALYSIS_DIR)
-from allocation import water_fill_allocate
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.allocation import water_fill_allocate
 
 
 def test_equal_distribution_when_capacity_allows():

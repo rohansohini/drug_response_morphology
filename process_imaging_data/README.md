@@ -65,11 +65,11 @@ The pipeline runs end-to-end for each drug condition in `config.DRUG_DIRS`. Step
 
 **1. `discover_raw_data.py`**: Discover each track's `track_table_*.mat` and `segmentation_info_*.mat` files from the `Cropped_XX/` folders, keyed by the folder's own track number, never the filename's.
 
-**2. `track_table.py`**: Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks. Rows beyond `config.MAX_FRAME` are dropped here, before any of the expensive per-frame mask work below runs.
+**2. `track_table.py`**: Load cell track tables from `.mat` files. Assigns globally unique `node_id`, `pred_node_id`, and `lin_id` across all tracks.
 
 **3. `append_labels.py`**: Append classification labels (`m_label`, `k_label`) to the cell DataFrame. One label pair per *cell* present at `config.DAY0_FRAMES[drug]`, day 0, the frame the drug was actually added on, propagated forward to each day-0 cell's own descendants via the `node_id`/`pred_node_id` chain. Cells before day 0, or from a lineage that dies out before reaching it, get `NaN` labels. See "Day 0 and Cell Classification" below.
 
-**4. `load_nuclear_data.py`**: Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts. Also restricted to `config.MAX_FRAME`.
+**4. `load_nuclear_data.py`**: Load nuclear segmentation data from `.mat` files. Converts MATLAB linear pixel indices to `(row, col)` subscripts.
 
 **5. `pixel_ids.py`**: Assign each cell a `pixel_id` by looking up its nucleus coordinates in the segmentation mask. Flags duplicate pixel IDs within a `(track, frame)` group.
 
@@ -165,8 +165,9 @@ PROCESSED_DATA_DIR = 'processed_data/' # path to output directory
 N_JOBS              = 16                # number of parallel jobs (set to match allocated cores)
 BUFFER              = 2                 # pixel buffer for nucleus coordinate lookup
 IMG_SIZE            = 2501              # side length of each track image (pixels)
-MAX_FRAME           = 13                # frames beyond this are excluded entirely (unreliable, heavy overcrowding)
 ```
+
+No frame cutoff here: every available raw frame is processed for every condition (frames beyond ~13 are known to get unreliable, heavy overcrowding from repeated division, but which frames are trustworthy enough to actually use is left to each downstream analysis's own config, not enforced here).
 
 Raw data is read directly from each path in `DRUG_DIRS`; nothing is copied into this repo. Each path must follow the layout described in Directory Structure above. Every key in `DRUG_DIRS` must have a matching key in `DAY0_FRAMES`.
 

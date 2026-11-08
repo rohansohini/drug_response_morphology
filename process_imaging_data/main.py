@@ -51,13 +51,6 @@ def process_drug(drug: str, drug_dir: str, day0_frame: int) -> None:
     df = load_track_table(track_table_files)
     print(f"  Loaded {len(df)} rows across {df['track'].nunique()} tracks ({time.time()-t:.1f}s)")
 
-    # restrict to reliable frames only - dropped here, before any of the
-    # expensive per-frame mask work below, so frames beyond MAX_FRAME cost
-    # nothing rather than just getting filtered out of the final export
-    n_before = len(df)
-    df = df[df['frame'] <= config.MAX_FRAME].reset_index(drop=True)
-    print(f"  Restricted to frames <= {config.MAX_FRAME}: {len(df)}/{n_before} rows kept")
-
     # --- step 2: append lineage classification labels ---
     print("\n[2/7] Appending classification labels...")
     t = time.time()
@@ -69,10 +62,6 @@ def process_drug(drug: str, drug_dir: str, day0_frame: int) -> None:
     t = time.time()
     nuc_df = load_nuclear_data(segmentation_info_files, img_size=config.IMG_SIZE)
     print(f"  Loaded {len(nuc_df)} nuclei ({time.time()-t:.1f}s)")
-
-    n_before = len(nuc_df)
-    nuc_df = nuc_df[nuc_df['frame'] <= config.MAX_FRAME].reset_index(drop=True)
-    print(f"  Restricted to frames <= {config.MAX_FRAME}: {len(nuc_df)}/{n_before} nuclei kept")
 
     # --- step 4: assign pixel IDs ---
     print("\n[4/7] Assigning pixel IDs...")

@@ -86,6 +86,30 @@ def test_respects_condition_weights_and_overlapping_frames():
           f"split (naive={n_naive}, vem={n_vem})")
 
 
+def test_respects_max_frame_cap():
+    # regression test: process_imaging_data no longer caps frames itself,
+    # so {drug}_metadata.csv can now contain frames well past config.MAX_FRAME
+    # (13) - select_cells must still exclude them, not silently start
+    # using whatever's newly available upstream.
+    rng = np.random.default_rng(0)
+    naive_df = make_condition_metadata(rng, NAIVE, range(1, 21), n_per_frame=200, pixel_id_start=1)
+    vem_df   = make_condition_metadata(rng, VEM, range(1, 21), n_per_frame=200, pixel_id_start=1_000_000)
+
+    assert config.MAX_FRAME == 13, "test assumes the real config.MAX_FRAME is 13 - update this test if that changes"
+
+    selected = select_cells({NAIVE: naive_df, VEM: vem_df})
+
+    assert selected['frame'].max() <= config.MAX_FRAME, (
+        f"expected no selected cell beyond frame {config.MAX_FRAME}, got frame {selected['frame'].max()}"
+    )
+    assert selected['frame'].max() == config.MAX_FRAME, (
+        "expected frames right up to MAX_FRAME to still be usable, not cut off early"
+    )
+
+    print(f"PASS: select_cells excludes frames beyond config.MAX_FRAME ({config.MAX_FRAME}) "
+          f"even though both conditions' metadata extends to frame 20")
+
+
 def test_rare_subclass_not_starved_or_overrepresented():
     rng = np.random.default_rng(1)
     naive_df = make_condition_metadata(rng, NAIVE, range(1, 6), n_per_frame=200, pixel_id_start=1)
@@ -214,6 +238,7 @@ def test_missing_condition_weight_raises_clearly():
 
 if __name__ == '__main__':
     test_respects_condition_weights_and_overlapping_frames()
+    test_respects_max_frame_cap()
     test_rare_subclass_not_starved_or_overrepresented()
     test_no_overlapping_frames_raises()
     test_total_selected_respects_budget_when_capacity_allows()
