@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=16
 #SBATCH --mem=64G
-#SBATCH --time=00:15:00
+#SBATCH --time=02:00:00
 #SBATCH --job-name=process_imaging
 #SBATCH --output=./logs/process_imaging_%j.out
 
