@@ -8,24 +8,33 @@ import os
 CONDITIONS = ['naive', 'vem_1uM', 'gem_2.5nM', 'tram_6nM']
 
 ###### Frames
-#  Compares conditions at two timepoints that share ONE embedding space
-#  (one CAJAL run per modality, pooling both frames' cells together - see
-#  main.py) rather than one independent run per frame, so frame 1 and
-#  frame 13 positions are directly comparable, not just visually similar.
+#  Compares conditions across EVERY frame shared by all four conditions
+#  (not just the first and last) in ONE embedding space - one CAJAL run
+#  per modality, pooling every condition and every shared frame's cells
+#  together (see main.py and select_cells.py), so every frame's
+#  positions are directly comparable, not independently-fit spaces that
+#  just happen to look similar. The four conditions don't necessarily
+#  all have the same number of frames, so "shared" is computed as the
+#  intersection, not assumed - see select_cells.py.
+#
 #  process_imaging_data itself no longer caps frames (see its own
 #  config.py) - {drug}_metadata.csv can now contain far more of them -
-#  so frame 13 here is this analysis's own deliberate choice (frames
+#  so MAX_FRAME here is this analysis's own deliberate choice (frames
 #  beyond that are known to get unreliable, heavy overcrowding from
-#  repeated division), explicitly capped rather than silently absorbing
-#  whatever else becomes available upstream.
-FRAMES = [1, 13]
+#  repeated division - naive in particular divides a lot, and it's one
+#  of the four conditions here), explicitly capped rather than silently
+#  absorbing whatever else becomes available upstream.
+MAX_FRAME = 13
 
 ###### Sampling
 #  Cells sampled per (frame, condition) bucket - see select_cells.py. A
 #  flat per-bucket size, not a total budget split by weight like
 #  naive_vs_vem - no water-filling needed since every condition is
-#  sampled independently and equally.
-SAMPLE_SIZE_PER_CONDITION = 1000
+#  sampled independently and equally. Smaller than a single-comparison
+#  analysis would use, since this now multiplies out across every shared
+#  frame (not just two) - e.g. 250 x 4 conditions x ~13 frames is
+#  already ~13,000 cells per modality going into CAJAL.
+SAMPLE_SIZE_PER_CONDITION = 250
 SAMPLE_SEED = 42
 
 ###### Paths

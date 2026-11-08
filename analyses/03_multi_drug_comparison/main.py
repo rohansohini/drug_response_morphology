@@ -39,27 +39,23 @@ def main():
     os.makedirs(config.MASKS_DIR, exist_ok=True)
     os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
 
-    # --- step 1/4: select cells across every condition AND both frames, into ONE shared pool ---
-    #  frame 1 and frame 13 cells go through the SAME CAJAL run and the
-    #  SAME UMAP/PHATE fit below (not one run each per frame) - so their
-    #  positions land in one shared embedding space and are directly
-    #  comparable, not just two independently-fit spaces that happen to
-    #  look similar. select_cells is still called once per frame (its
-    #  own sampling bucket - see select_cells.py), with a single shared
-    #  rng carried across every call so the whole selection stays
-    #  reproducible and every bucket draws independently.
+    # --- step 1/4: select cells across every condition AND every shared frame, into ONE shared pool ---
+    #  every selected cell - whatever frame it's from - goes through the
+    #  SAME CAJAL run and the SAME UMAP/PHATE fit below (not one run per
+    #  frame) - so every frame's positions land in one shared embedding
+    #  space and are directly comparable, not independently-fit spaces
+    #  that happen to look similar. See select_cells.py for exactly how
+    #  "shared" frames are computed (the four conditions don't
+    #  necessarily have the same number of frames) and config.MAX_FRAME.
     print("[1/4] Loading metadata and selecting cells...")
     metadata_by_condition = {c: pd.read_csv(config.metadata_csv_path(c)) for c in config.CONDITIONS}
 
     rng = np.random.default_rng(config.SAMPLE_SEED)
-    selected = pd.concat(
-        [select_cells(metadata_by_condition, frame, rng) for frame in config.FRAMES],
-        ignore_index=True,
-    )
+    selected = select_cells(metadata_by_condition, rng)
     selected['sampled'] = True   # extract_masks expects this column name
 
-    print(f"  Selected {len(selected)} cells total")
-    for frame in config.FRAMES:
+    print(f"  Selected {len(selected)} cells total across {selected['frame'].nunique()} frames")
+    for frame in sorted(selected['frame'].unique()):
         for condition in config.CONDITIONS:
             n = ((selected['frame'] == frame) & (selected['condition'] == condition)).sum()
             print(f"    frame {frame}/{condition}: {n} cells")
@@ -69,11 +65,11 @@ def main():
     print(f"  Saved selection to {selected_path}")
 
     # --- step 2/4: extract masks for every selected cell, per condition ---
-    #  each condition's own call covers BOTH frames at once - extract_masks
-    #  already loops over every frame present in the df it's given, and
-    #  mask filenames are frame-scoped, so frame 1 and frame 13 masks land
-    #  safely side by side in the same cell/ and nuc/ folders rather than
-    #  needing their own separate subfolders.
+    #  each condition's own call covers every shared frame at once -
+    #  extract_masks already loops over every frame present in the df
+    #  it's given, and mask filenames are frame-scoped, so every frame's
+    #  masks land safely side by side in the same cell/ and nuc/ folders
+    #  rather than needing their own separate subfolders.
     print("\n[2/4] Extracting masks...")
     for condition in config.CONDITIONS:
         condition_df = selected[selected['condition'] == condition]
