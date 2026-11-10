@@ -1,25 +1,21 @@
 '''
-Run directly: python3 tests/analyses/02_vem_48hr_pretreatment/test_lineage_fate.py
+Run directly: python3 tests/shared/test_lineage_fate.py
 '''
 import os
 import sys
 import tempfile
-from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '02_vem_48hr_pretreatment')
-sys.path.insert(0, ANALYSIS_DIR)
-import config
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared import lineage_fate
 
-# lineage_fate.py resolves config.PROCESS_IMAGING_DATA_ROOT onto sys.path
-# at import time to reuse process_imaging_data's own pipeline code - point
-# it at the real nested location instead of config.py's placeholder path,
-# so `import lineage_fate` below actually finds `pipeline.*`
-config.PROCESS_IMAGING_DATA_ROOT = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'process_imaging_data')
-
-import lineage_fate
+# a stand-in classification scheme for the tests below - the real values
+# live in each analysis's own config.py (see shared/classify.py), but
+# compute_frame1_fate_percentages itself only cares about these 5 values
+DYING_M_LABEL, PERSISTING_M_LABEL, PROLIF_M_LABEL = 1, 2, 3
+SLOW_K_LABELS, FAST_K_LABELS = [1, 2], [3, 4, 5, 6]
 
 
 def write_track_table_mat(path, rows):
@@ -96,7 +92,12 @@ def test_compute_frame1_fate_percentages_single_descendant_is_100_percent():
         )
         raw_to_global = {(1, 5): 42}
 
-        result = lineage_fate.compute_frame1_fate_percentages(lineage_path, clone_path, raw_to_global)
+        result = lineage_fate.compute_frame1_fate_percentages(
+            lineage_path, clone_path, raw_to_global,
+            dying_m_label=DYING_M_LABEL, persisting_m_label=PERSISTING_M_LABEL,
+            prolif_m_label=PROLIF_M_LABEL,
+            slow_k_labels=SLOW_K_LABELS, fast_k_labels=FAST_K_LABELS,
+        )
 
         assert len(result) == 1
         row = result.iloc[0]
@@ -118,7 +119,12 @@ def test_compute_frame1_fate_percentages_mixed_siblings():
         )
         raw_to_global = {(2, 9): 7}
 
-        result = lineage_fate.compute_frame1_fate_percentages(lineage_path, clone_path, raw_to_global)
+        result = lineage_fate.compute_frame1_fate_percentages(
+            lineage_path, clone_path, raw_to_global,
+            dying_m_label=DYING_M_LABEL, persisting_m_label=PERSISTING_M_LABEL,
+            prolif_m_label=PROLIF_M_LABEL,
+            slow_k_labels=SLOW_K_LABELS, fast_k_labels=FAST_K_LABELS,
+        )
 
         assert len(result) == 1
         row = result.iloc[0]
@@ -136,7 +142,12 @@ def test_compute_frame1_fate_percentages_raises_on_unresolved_lineage():
         raw_to_global = {}  # (1, 99) is not in here
 
         try:
-            lineage_fate.compute_frame1_fate_percentages(lineage_path, clone_path, raw_to_global)
+            lineage_fate.compute_frame1_fate_percentages(
+                lineage_path, clone_path, raw_to_global,
+                dying_m_label=DYING_M_LABEL, persisting_m_label=PERSISTING_M_LABEL,
+                prolif_m_label=PROLIF_M_LABEL,
+                slow_k_labels=SLOW_K_LABELS, fast_k_labels=FAST_K_LABELS,
+            )
         except AssertionError as e:
             assert 'no matching' in str(e)
             print("PASS: an unresolved (file_idx, old_clone_id_frame1) raises clearly")
@@ -151,7 +162,12 @@ def test_compute_frame1_fate_percentages_raises_on_out_of_range_new_clone_id():
         raw_to_global = {(1, 1): 10}
 
         try:
-            lineage_fate.compute_frame1_fate_percentages(lineage_path, clone_path, raw_to_global)
+            lineage_fate.compute_frame1_fate_percentages(
+                lineage_path, clone_path, raw_to_global,
+                dying_m_label=DYING_M_LABEL, persisting_m_label=PERSISTING_M_LABEL,
+                prolif_m_label=PROLIF_M_LABEL,
+                slow_k_labels=SLOW_K_LABELS, fast_k_labels=FAST_K_LABELS,
+            )
         except AssertionError as e:
             assert 'new_clone_id_global' in str(e)
             print("PASS: a new_clone_id_global outside cloneClassification's row range raises clearly")

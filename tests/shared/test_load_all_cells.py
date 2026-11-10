@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/analyses/02_vem_48hr_pretreatment/test_load_all_cells.py
+Run directly: python3 tests/shared/test_load_all_cells.py
 '''
 import os
 import sys
@@ -8,9 +8,8 @@ import tempfile
 import numpy as np
 import pandas as pd
 
-ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'analyses', '02_vem_48hr_pretreatment')
-sys.path.insert(0, ANALYSIS_DIR)
-from load_all_cells import load_all_cells
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+from shared.load_all_cells import load_all_cells
 
 
 def make_metadata_csv(path):

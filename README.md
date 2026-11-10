@@ -32,6 +32,14 @@ Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`,
 
 Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
 
+### [`vem_120hr_pretreatment`](analyses/05_vem_120hr_pretreatment/README.md)
+
+The same question as `vem_48hr_pretreatment`, 5 days before treatment instead of 2: does a `vem_1uM_120hrsbefore` cell's shape before drug addition predict its day-0 descendants' eventual fate mixture?
+
+### [`vem_120hr_lineage_relatedness`](analyses/06_vem_120hr_lineage_relatedness/README.md)
+
+Asks whether sister cells, and separately cousin cells, are morphologically more alike than a random pair - compared before vs. after vemurafenib treatment, using the same `vem_1uM_120hrsbefore` dataset's full lineage tree (not just its frame-1-to-day-0 mapping).
+
 ---
 
 ## Directory structure
@@ -56,6 +64,10 @@ drug_response_morphology/
 │   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
 │   ├── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
 │   ├── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
+│   ├── lineage_fate.py                # frame-1 lineage -> day-0 fate-mixture percentages (from a lineage_frame{N}_to_frame1.mat mapping)
+│   ├── load_all_cells.py              # loads every available cell within given frames (no classification, no sampling budget)
+│   ├── lineage_tree.py                # reconstructs division trees from node_id/pred_node_id/lin_id; finds sister/cousin pairs
+│   ├── pair_similarity.py             # shared-null permutation test + plot for "are these pairs more alike than random cells"
 │   └── allocation.py                  # water-filling budget allocation
 ├── analyses/
 │   ├── 01_naive_vs_vem/
@@ -70,8 +82,6 @@ drug_response_morphology/
 │   │   ├── README.md
 │   │   ├── main.py
 │   │   ├── config.py                  # dataset name, frames, paths
-│   │   ├── load_all_cells.py          # loads every available frame-1 cell (no classification, see lineage_fate.py)
-│   │   ├── lineage_fate.py            # frame-1 lineage -> day-0 fate-mixture percentages
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
@@ -83,11 +93,26 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
-│   └── 04_vem_full_timecourse/
+│   ├── 04_vem_full_timecourse/
+│   │   ├── README.md
+│   │   ├── main.py                    # single-condition CAJAL run, every available frame
+│   │   ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
+│   │   ├── select_cells.py            # single-condition water-filled sampling, no frame cap
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored)
+│   ├── 05_vem_120hr_pretreatment/
+│   │   ├── README.md
+│   │   ├── main.py
+│   │   ├── config.py                  # dataset name, frames, paths
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored)
+│   └── 06_vem_120hr_lineage_relatedness/
 │       ├── README.md
-│       ├── main.py                    # single-condition CAJAL run, every available frame
-│       ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
-│       ├── select_cells.py            # single-condition water-filled sampling, no frame cap
+│       ├── main.py                    # single-condition CAJAL run, no embedding
+│       ├── config.py                  # dataset name, control/treatment frame ranges, sampling, paths
+│       ├── select_cells.py            # flat per-frame sampling, no budget-splitting, no subclass
 │       ├── slurm_submit.sh
 │       ├── notebooks/
 │       └── output/                    # generated (gitignored)
@@ -96,9 +121,9 @@ drug_response_morphology/
 │   ├── shared/                        # tests for shared/, no real data needed
 │   └── analyses/
 │       ├── 01_naive_vs_vem/
-│       ├── 02_vem_48hr_pretreatment/
 │       ├── 03_multi_drug_comparison/
-│       └── 04_vem_full_timecourse/
+│       ├── 04_vem_full_timecourse/
+│       └── 06_vem_120hr_lineage_relatedness/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 
@@ -113,7 +138,7 @@ output/
         └── plot_data.csv                # the same data each plot above is drawn from
 ```
 
-Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). `vem_48hr_pretreatment`'s permutation-test notebook instead exports one row per permutation, per modality: `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality).
+Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). The permutation-test notebooks instead export one row per permutation: `vem_48hr_pretreatment`/`vem_120hr_pretreatment` have `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality); `vem_120hr_lineage_relatedness` has `modality`, `frame_range`, `null_distance`, `sister_mean_distance`/`sister_p_value`, `cousin_mean_distance`/`cousin_p_value` (repeated on every row of their modality+range group).
 
 ---
 
@@ -121,7 +146,7 @@ Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_pl
 
 1. `mkdir -p analyses/<name>/notebooks`
 2. Write `analyses/<name>/config.py`: at minimum the paths into `process_imaging_data`'s output (see either existing `config.py` as a template) and whatever's specific to this analysis (conditions, frames, sampling).
-3. Write `analyses/<name>/main.py`, reusing `shared.cajal.extract_masks/run_cajal/embed` directly. Only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `01_naive_vs_vem/select_cells.py` for budget-based sampling, or `02_vem_48hr_pretreatment/load_all_cells.py` for "use everything").
+3. Write `analyses/<name>/main.py`, reusing `shared.cajal.extract_masks/run_cajal/embed` directly. Only the cell-selection step (how you decide which cells go into CAJAL) is usually analysis-specific logic, worth its own small module next to `main.py` (see `01_naive_vs_vem/select_cells.py` for budget-based sampling, or `shared/load_all_cells.py` for "use everything within some frames").
 4. Write notebook(s) under `analyses/<name>/notebooks/`, using `shared.load_data.load_full_dataset` and `shared.density_plots.export_kde_by_frame` (or `plot_embedding_with_kde` directly for something custom). Copy an existing notebook's cell 1 path-setup verbatim, it's analysis-agnostic. Every existing notebook loops over both `'umap'` and `'phate'` and plots each with the embedding method as a filename suffix (see any existing notebook's cell 3): follow that same pattern rather than picking just one. End with `shared.load_data.export_plot_data` on the `{embedding_method: df}` dict(s) `process_modality()` already built, saved to `NOTEBOOK_PLOTS_DIR/plot_data.csv` - see any existing notebook's last cell.
 5. Add a `slurm_submit.sh` that `cd`s into `analyses/<name>/` before running `python main.py`.
 6. Add `analyses/<name>/README.md` describing what the analysis does and how its pieces fit together. See any existing analysis's README for the expected level of detail.

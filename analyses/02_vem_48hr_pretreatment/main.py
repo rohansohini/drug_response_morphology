@@ -16,7 +16,7 @@ REPO_ROOT    = os.path.abspath(os.path.join(ANALYSIS_DIR, '..', '..'))
 sys.path.insert(0, REPO_ROOT)
 
 import config
-from load_all_cells import load_all_cells
+from shared.load_all_cells import load_all_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal, needs_recompute
 

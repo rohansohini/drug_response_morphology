@@ -4,13 +4,17 @@ import sys
 import pandas as pd
 from scipy.io import loadmat
 
-import config
-
-sys.path.insert(0, config.PROCESS_IMAGING_DATA_ROOT)
+# process_imaging_data/ is part of this same repo, at a fixed location
+# relative to this file (shared/ and process_imaging_data/ are both
+# direct children of the repo root) - derived from __file__ rather than
+# depending on whichever analysis's own config.py happens to already be
+# on sys.path, since this module is shared across analyses, not owned by
+# any one of them.
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(_REPO_ROOT, 'process_imaging_data'))
 from pipeline.discover_raw_data import discover_tracks
 from pipeline.track_table import load_track, make_master_ids
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from shared.classify import classify_subclass
 
 SUBCLASSES = ['dying', 'persisting', 'slow_prolif', 'fast_prolif']
@@ -59,17 +63,20 @@ def build_raw_to_global_lin_id(drug_dir: str) -> dict[tuple[int, int], int]:
 
 
 def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path: str,
-                                     raw_to_global: dict[tuple[int, int], int]) -> pd.DataFrame:
+                                     raw_to_global: dict[tuple[int, int], int],
+                                     dying_m_label: int, persisting_m_label: int, prolif_m_label: int,
+                                     slow_k_labels: list[int], fast_k_labels: list[int]) -> pd.DataFrame:
     '''
     For each frame-1 lineage (identified by its global lin_id), compute
-    the fraction of its day-0 (frame 3) descendants in each of the 4
-    subclasses: %dying, %persisting, %slow_prolif, %fast_prolif. A
-    lineage with only one day-0 descendant gets a "percentage" of 100%
-    in that one descendant's subclass and 0% in the other three -
-    percentages are not restricted to lineages that actually split.
+    the fraction of its day-0 descendants in each of the 4 subclasses:
+    %dying, %persisting, %slow_prolif, %fast_prolif. A lineage with only
+    one day-0 descendant gets a "percentage" of 100% in that one
+    descendant's subclass and 0% in the other three - percentages are
+    not restricted to lineages that actually split.
 
     Inputs:
-        lineage_mat_path:      path to lineage_frame3_to_frame1.mat
+        lineage_mat_path:      path to this dataset's own
+                               lineage_frame{N}_to_frame1.mat
                                (var.lineage_table: file_idx,
                                new_clone_id_global, old_clone_id_frame1)
         clone_kmeans_mat_path: path to clone_kmeans_id.mat
@@ -77,6 +84,9 @@ def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path
                                is the 1-indexed row number into it)
         raw_to_global:         from build_raw_to_global_lin_id - resolves
                                (file_idx, old_clone_id_frame1) to a global lin_id
+        dying_m_label, persisting_m_label, prolif_m_label,
+        slow_k_labels, fast_k_labels: this dataset's own classification
+                               scheme - see shared.classify.classify_subclass
     Outputs:
         df: one row per frame-1 lineage (global lin_id) that has at least
             one day-0 descendant, columns [lin_id, n_day0_descendants,
@@ -92,9 +102,9 @@ def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path
     )
     class_data['subclass'] = classify_subclass(
         class_data,
-        dying_m_label=config.DYING_M_LABEL, persisting_m_label=config.PERSISTING_M_LABEL,
-        prolif_m_label=config.PROLIF_M_LABEL,
-        slow_k_labels=config.SLOW_K_LABELS, fast_k_labels=config.FAST_K_LABELS,
+        dying_m_label=dying_m_label, persisting_m_label=persisting_m_label,
+        prolif_m_label=prolif_m_label,
+        slow_k_labels=slow_k_labels, fast_k_labels=fast_k_labels,
     )
 
     assert lineage_df['new_clone_id_global'].between(1, len(class_data)).all(), (
