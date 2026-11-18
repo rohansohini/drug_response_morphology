@@ -13,14 +13,14 @@ DRUG = 'vem_1uM_144hrsbefore'
 
 TREATMENT_START_FRAME = 7    # day 0 - fixed by the data, not tunable
 CONTROL_END_FRAME      = 5    # control range: frames 1-CONTROL_END_FRAME
-TREATMENT_END_FRAME    = 25   # treatment range: frames TREATMENT_START_FRAME-TREATMENT_END_FRAME, pushed out to use as much of the available data as possible
+TREATMENT_END_FRAME    = 11   # treatment range: frames TREATMENT_START_FRAME-TREATMENT_END_FRAME
 #  frame 6 (day -1, the frame immediately before day 0) is missing
 #  entirely from this dataset's raw data as of writing - it falls
-#  outside BOTH ranges above (frames 1-5 and 7-25), so it's simply never
+#  outside BOTH ranges above (frames 1-5 and 7-11), so it's simply never
 #  selected at all, deliberately. select_cells.py and the notebook also
 #  both skip any OTHER empty frame gracefully, rather than assuming
 #  every configured frame has cells - useful if a frame somewhere in
-#  7-25 also turns out to be missing.
+#  7-11 also turns out to be missing.
 
 ###### Sampling
 #  No subclass stratification here - this analysis never classifies
