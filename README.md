@@ -32,7 +32,7 @@ Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`,
 
 Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
 
-### [`vem_144hr_lineage_relatedness`](analyses/06_vem_144hr_lineage_relatedness/README.md)
+### [`vem_144hr_lineage_relatedness`](analyses/05_vem_144hr_lineage_relatedness/README.md)
 
 Asks whether sister cells, and separately cousin cells, are morphologically more alike than a random pair - compared before vs. after vemurafenib treatment, using the same `vem_1uM_144hrsbefore` dataset's full lineage tree (not just its frame-1-to-day-0 mapping).
 
@@ -97,7 +97,7 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
-│   └── 06_vem_144hr_lineage_relatedness/
+│   └── 05_vem_144hr_lineage_relatedness/
 │       ├── README.md
 │       ├── main.py                    # single-condition CAJAL run, no embedding
 │       ├── config.py                  # dataset name, control/treatment frame ranges, sampling, paths
@@ -112,7 +112,7 @@ drug_response_morphology/
 │       ├── 01_naive_vs_vem/
 │       ├── 03_multi_drug_comparison/
 │       ├── 04_vem_full_timecourse/
-│       └── 06_vem_144hr_lineage_relatedness/
+│       └── 05_vem_144hr_lineage_relatedness/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 

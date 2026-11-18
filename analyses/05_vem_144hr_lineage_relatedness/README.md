@@ -28,6 +28,6 @@ Frame 7 is day 0 (drug addition). Frames 1-`config.CONTROL_END_FRAME` (5, for no
 Follows the same pattern as every other analysis. See the root README's "Running an analysis" section:
 
 ```bash
-cd analyses/06_vem_144hr_lineage_relatedness
+cd analyses/05_vem_144hr_lineage_relatedness
 sbatch slurm_submit.sh
 ```

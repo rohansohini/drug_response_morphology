@@ -1,5 +1,5 @@
 '''
-Run directly: python3 tests/analyses/06_vem_144hr_lineage_relatedness/test_select_cells.py
+Run directly: python3 tests/analyses/05_vem_144hr_lineage_relatedness/test_select_cells.py
 '''
 import os
 import sys
@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 REPO_ROOT    = os.path.join(os.path.dirname(__file__), '..', '..', '..')
-ANALYSIS_DIR = os.path.join(REPO_ROOT, 'analyses', '06_vem_144hr_lineage_relatedness')
+ANALYSIS_DIR = os.path.join(REPO_ROOT, 'analyses', '05_vem_144hr_lineage_relatedness')
 sys.path.insert(0, REPO_ROOT)
 sys.path.insert(0, ANALYSIS_DIR)
 import config
