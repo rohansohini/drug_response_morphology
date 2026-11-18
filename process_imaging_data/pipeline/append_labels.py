@@ -25,12 +25,21 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
     lin_id, get that sibling's own (different) label instead.
 
     Any cell that is neither itself present at day0_frame nor a
-    descendant of one gets NaN labels:
+    descendant of one gets NaN labels, for one of two distinct reasons
+    (reported as separate counts - see the printed summary below):
       - every cell strictly before day0_frame - its fate isn't classified
         until day 0 (a shared pre-day0 ancestor can fan out into several
         differently-labeled day-0 descendants, so no single label could
-        correctly apply to it anyway)
-      - a lineage that dies out before ever reaching day0_frame
+        correctly apply to it anyway). A lineage that dies out before
+        ever reaching day0_frame only ever has rows in this category -
+        it contributes no rows at or after day0_frame to count separately.
+      - a cell at or after day0_frame whose own lineage nonetheless has
+        no recorded row at EXACTLY frame==day0_frame - e.g. a tracking/
+        segmentation gap right at that one frame, with tracking resuming
+        later and referencing an earlier (pre-day0) node_id as
+        predecessor. The forward walk below only ever starts from real
+        day0_frame rows, so this lineage (and everything downstream of
+        it) is never reached, even though rows after day 0 exist for it.
 
     For any drug where day0_frame is 1 (every condition except a
     pre-treatment-baseline one), frame 1 is the very start of imaging, so
@@ -49,8 +58,9 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
                      this condition - see config.DAY0_FRAMES
     Outputs:
         df: input DataFrame with m_label and k_label columns added (NaN
-            for any cell before day0_frame, or from a lineage that died
-            out before reaching it)
+            for any cell before day0_frame, or unreachable from a
+            day0_frame cell due to a tracking gap at that frame - see
+            above)
     '''
     df         = df.copy()
     class_data = pd.DataFrame(loadmat(labels_path)['cloneClassification'])
@@ -103,10 +113,30 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
     df['m_label'] = row_idx.map(lambda r: class_data.iloc[int(r), 0] if pd.notna(r) else np.nan)
     df['k_label'] = row_idx.map(lambda r: class_data.iloc[int(r), 1] if pd.notna(r) else np.nan)
 
-    n_unlabeled = int(row_idx.isna().sum())
+    # two distinct causes, reported separately rather than lumped into one
+    # count: a row strictly before day0_frame is ALWAYS unlabeled (fate
+    # isn't determined yet - node_to_row only ever grows from day0_frame
+    # nodes forward, never backward, so this split doesn't need its own
+    # isna() check to be exact, but one is used anyway for robustness).
+    # A row at or after day0_frame can still end up unlabeled if its own
+    # lineage has no recorded row at exactly frame==day0_frame - e.g. a
+    # tracking/segmentation gap right at that one frame, with tracking
+    # resuming later referencing an earlier (pre-day0) node_id as
+    # predecessor - the forward walk below only ever starts from REAL
+    # day0_frame rows, so such a lineage (and everything downstream of
+    # it) is never reached, even though it has rows after day 0.
+    unlabeled = row_idx.isna()
+    n_before_day0 = int((unlabeled & (df['frame'] < day0_frame)).sum())
+    n_gap_at_day0 = int((unlabeled & (df['frame'] >= day0_frame)).sum())
+    n_unlabeled   = n_before_day0 + n_gap_at_day0
+
     if n_unlabeled > 0:
-        print(f"  {n_unlabeled} row(s) before day 0 (frame {day0_frame}), or from a lineage that died "
-              f"before reaching it, have no label")
+        print(f"  {n_unlabeled} row(s) have no label:")
+        print(f"    {n_before_day0} before day 0 (frame {day0_frame}) - not yet classifiable, "
+              f"fate isn't determined until day 0")
+        print(f"    {n_gap_at_day0} at or after day 0, but unreachable from any day-0 cell - "
+              f"this lineage has no recorded row at exactly frame {day0_frame} itself (a tracking/"
+              f"segmentation gap at that frame, with tracking resuming later)")
 
     n_m_labels = df['m_label'].nunique()
     n_k_labels = df['k_label'].nunique()

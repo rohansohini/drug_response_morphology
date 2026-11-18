@@ -1,6 +1,8 @@
 '''
 Run directly: python3 tests/process_imaging_data/test_append_labels.py
 '''
+import contextlib
+import io
 import os
 import sys
 from unittest.mock import patch
@@ -135,6 +137,40 @@ def test_lineage_that_dies_before_day0_gets_nan_throughout():
     print("PASS: a lineage that dies before day 0 gets NaN throughout, without affecting surviving lineages")
 
 
+def test_before_day0_and_tracking_gap_at_day0_are_counted_and_reported_separately():
+    # lineage A has a tracking gap AT day0_frame itself: node 2 (frame 2)
+    # resumes at node 3 (frame 4, pred_node_id=2), skipping frame 3
+    # entirely - so A is never reachable from any day0 cell, even though
+    # it has rows after day 0 (nodes 3, 4). lineage B is a normal lineage
+    # that does have a real row at frame 3 (node 12, the one day0 cell).
+    df = pd.DataFrame({
+        'node_id':      [1, 2, 3, 4, 10, 11, 12, 13],
+        'pred_node_id': [0, 1, 2, 3, 0,  10, 11, 12],
+        'frame':        [1, 2, 4, 5, 1,  2,  3,  4],
+    })
+    class_data = np.array([[7, 7]])  # exactly one day0 cell: node 12
+
+    captured = io.StringIO()
+    with patch('pipeline.append_labels.loadmat', side_effect=fake_loadmat(class_data)):
+        with contextlib.redirect_stdout(captured):
+            result = append_labels(df, '/fake/path.mat', day0_frame=3)
+
+    # nodes 1, 2, 10, 11 (frame < 3): unconditionally unlabeled
+    assert result.loc[result['node_id'].isin([1, 2, 10, 11]), 'm_label'].isna().all()
+    # nodes 3, 4 (frame >= 3, but lineage A never had a row AT frame 3):
+    # unlabeled too, despite being after day 0
+    assert result.loc[result['node_id'].isin([3, 4]), 'm_label'].isna().all()
+    # nodes 12 (the day0 cell itself), 13 (its child): correctly labeled
+    assert list(result.loc[result['node_id'] == 12, 'm_label']) == [7]
+    assert list(result.loc[result['node_id'] == 13, 'm_label']) == [7]
+
+    log = captured.getvalue()
+    assert "6 row(s) have no label" in log
+    assert "4 before day 0" in log
+    assert "2 at or after day 0" in log
+    print("PASS: before-day0 and gap-at-day0 unlabeled rows are counted correctly and reported as separate lines")
+
+
 def test_day0_frame_mismatch_raises_clearly():
     df = pd.DataFrame({
         'node_id':      [1, 2, 3],
@@ -160,5 +196,6 @@ if __name__ == '__main__':
     test_raises_when_class_data_too_long()
     test_siblings_from_a_pre_day0_division_get_independent_labels()
     test_lineage_that_dies_before_day0_gets_nan_throughout()
+    test_before_day0_and_tracking_gap_at_day0_are_counted_and_reported_separately()
     test_day0_frame_mismatch_raises_clearly()
     print("\nAll tests passed.")
