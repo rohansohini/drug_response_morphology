@@ -18,10 +18,12 @@ def select_cells(metadata: pd.DataFrame, rng: np.random.Generator) -> pd.DataFra
     cousin pairs end up with both members selected is left entirely to
     chance, not biased towards keeping more of them (see config.py).
 
-    A frame with zero has_mask=True cells (e.g. frame
-    config.CONTROL_END_FRAME itself, currently missing from this
-    dataset) is skipped gracefully rather than erroring - it just
-    contributes no cells and no sister/cousin pairs from that frame.
+    A frame with zero has_mask=True cells (e.g. frame 6, currently
+    missing from this dataset entirely - still visited by the loop
+    below since it iterates every frame up to config.TREATMENT_END_FRAME,
+    not just the two named control/treatment ranges) is skipped
+    gracefully rather than erroring - it just contributes no cells and
+    no sister/cousin pairs from that frame.
 
     Inputs:
         metadata: this drug's full metadata DataFrame (must have: frame,
