@@ -40,12 +40,23 @@ def test_load_track_table_uses_dict_key_not_filename():
 
 
 def make_fake_cluster(n_nuclei=1):
-    centroid   = np.empty((1, n_nuclei), dtype=object)
-    pixel_idx  = np.empty((1, n_nuclei), dtype=object)
+    # a numpy.void record with named fields, matching exactly what
+    # scipy.io.loadmat hands back for a real MATLAB struct (confirmed
+    # directly) - NOT a plain dict, which load_nuclear_data.py can now
+    # tell apart from a real struct via .dtype.names (see its own
+    # handling of a frame with zero nuclei, saved as an empty [] matrix
+    # rather than a struct at all)
+    dt = np.dtype([('Centroid', object), ('PixelIdxList', object)])
+    cluster = np.zeros((1,), dtype=dt)[0]
+
+    centroid  = np.empty((1, n_nuclei), dtype=object)
+    pixel_idx = np.empty((1, n_nuclei), dtype=object)
     for i in range(n_nuclei):
         centroid[0, i]  = np.array([float(i + 1), float(i + 1)])
         pixel_idx[0, i] = np.array([1])
-    return {'Centroid': centroid, 'PixelIdxList': pixel_idx}
+    cluster['Centroid']     = centroid
+    cluster['PixelIdxList'] = pixel_idx
+    return cluster
 
 
 def fake_nuclear_mat(file_path):

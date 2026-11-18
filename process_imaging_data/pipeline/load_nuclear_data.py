@@ -40,8 +40,25 @@ def load_nuclear_data(segmentation_info_files: dict[int, str], img_size: int = 2
         n_frames = data['clusters'].shape[0]
 
         for f in range(n_frames):
-            cluster  = data['clusters'][f][0]
+            cluster = data['clusters'][f][0]
+
+            # a frame where this track had NO nuclei detected at all is
+            # saved as an empty matrix ([] in MATLAB), not a struct with
+            # empty Centroid/PixelIdxList fields - cluster['PixelIdxList']
+            # only works on an actual struct (string field access raises
+            # IndexError on a plain ndarray), so check for this case
+            # first. A struct that DOES exist but has an empty
+            # PixelIdxList (n_nuclei == 0) is the same situation
+            # serialized differently - treat both the same way: no
+            # nuclei this frame, contribute no rows. join_data.py
+            # already expects this (a cell with no nuclear match at all
+            # gets mask_fail_reason='no_nuc_match' via its left join),
+            # so skipping is the correct behavior, not a workaround.
+            if cluster.dtype.names is None:
+                continue
             n_nuclei = cluster['PixelIdxList'].shape[1]
+            if n_nuclei == 0:
+                continue
 
             # centroid coordinates, converted from 1-indexed (MATLAB) to 0-indexed (Python)
             centroid = np.array([i.flatten() for i in cluster['Centroid'][0]]) - 1
@@ -60,4 +77,9 @@ def load_nuclear_data(segmentation_info_files: dict[int, str], img_size: int = 2
                 'pixel_idx_list': pixel_idx_list,
             }))
 
+    assert rows, (
+        f"every frame across every one of {len(segmentation_info_files)} track(s) had zero nuclei - "
+        f"nothing to return. This is almost certainly a sign something's wrong upstream (e.g. the "
+        f"wrong segmentation_info_*.mat files), not a real all-empty dataset."
+    )
     return pd.concat(rows, ignore_index=True)
