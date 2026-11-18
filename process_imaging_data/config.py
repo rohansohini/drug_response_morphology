@@ -13,8 +13,8 @@ import os
 DRUG_DIRS = {
     'naive':   '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/naive',
     'vem_1uM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM',
-    'vem_48hrsbefore': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_48hrsbefore',
-    'vem_144hrsbefore': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_144hrsbefore',
+    'vem_1uM_48hrsbefore': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_48hrsbefore',
+    'vem_1uM_144hrsbefore': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/vem_1uM_144hrsbefore',
     'gem_2.5nM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/gem_2.5nM',
     'tram_6nM': '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_data/tram_6nM'
 }
@@ -37,8 +37,8 @@ DRUG_DIRS = {
 DAY0_FRAMES = {
     'naive':            1,
     'vem_1uM':          1,
-    'vem_48hrsbefore':  3,   # imaging starts 2 days before the drug is added on frame 3
-    'vem_144hrsbefore': 7,   # imaging starts 6 days before the drug is added on frame 7
+    'vem_1uM_48hrsbefore':  3,   # imaging starts 2 days before the drug is added on frame 3
+    'vem_1uM_144hrsbefore': 7,   # imaging starts 6 days before the drug is added on frame 7
     'gem_2.5nM':        1,
     'tram_6nM':         1,
 }
