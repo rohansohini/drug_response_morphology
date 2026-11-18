@@ -7,7 +7,7 @@ For the `vem_1uM_48hrsbefore` dataset: frame 1 is day -2 (2 days *before* drug a
 3. **Resolves each frame-1 lineage's eventual fate mixture** (`shared/lineage_fate.py`): a frame-1 lineage can already have divided by day 0 (e.g. 3 cells at frame 1 expanding to 100 by day 0), and each of those day-0 descendants can land in a *different* subclass. So instead of one hard label, each frame-1 cell gets `%dying`/`%persisting`/`%slow_prolif`/`%fast_prolif`, resolved from `lineage_frame3_to_frame1.mat` and `clone_kmeans_id.mat` (raw, track-local lineage IDs resolved to this analysis's own `lin_id` by reusing `process_imaging_data`'s `load_track`/`make_master_ids` directly).
 4. **`01_morphology_predicts_fate.ipynb`** asks: does pre-treatment shape predict that mixture? For each cell, it predicts the cell's own fate mixture from the mixtures of its *k* nearest neighbors in real morphological (CAJAL GW) distance, then tests whether that prediction beats chance by comparing its error against many random reassignments of mixture to cell (`shared/morphology_predicts_fate.py`'s `knn_prediction_permutation_test`). One figure per modality: the permutation null distribution with the real (observed) prediction error marked.
 
-`shared/lineage_fate.py`/`shared/load_all_cells.py` are shared with [`vem_120hr_pretreatment`](../05_vem_120hr_pretreatment/README.md) - the same frame-1-predicts-day-0-fate question, 5 days before treatment instead of 2.
+`shared/lineage_fate.py`/`shared/load_all_cells.py` are shared with [`vem_144hr_pretreatment`](../05_vem_144hr_pretreatment/README.md) - the same frame-1-predicts-day-0-fate question, 6 days before treatment instead of 2.
 
 ---
 

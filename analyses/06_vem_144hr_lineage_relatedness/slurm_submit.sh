@@ -6,13 +6,13 @@
 #SBATCH --cpus-per-task=52
 #SBATCH --mem=192G
 #SBATCH --time=24:00:00
-#SBATCH --job-name=06_vem_120hr_lineage_relatedness
-#SBATCH --output=./logs/06_vem_120hr_lineage_relatedness_%j.out
+#SBATCH --job-name=06_vem_144hr_lineage_relatedness
+#SBATCH --output=./logs/06_vem_144hr_lineage_relatedness_%j.out
 
 module purge
 eval "$(conda shell.bash hook)"
 
-cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/06_vem_120hr_lineage_relatedness
+cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/06_vem_144hr_lineage_relatedness
 conda activate drug_morpho
 
 # unbuffer stdout so print() shows up in the log in real time, instead of

@@ -1,24 +1,25 @@
 import os
 
 ###### This dataset
-#  vem_1uM_120hrsbefore, the same dataset 05_vem_120hr_pretreatment uses:
-#  frame 6 is day 0 (drug addition). Frames 1-CONTROL_END_FRAME are
+#  vem_1uM_144hrsbefore, the same dataset 05_vem_144hr_pretreatment uses:
+#  frame 7 is day 0 (drug addition). Frames 1-CONTROL_END_FRAME are
 #  BEFORE treatment (~naive growth, used here as a control); frames
 #  TREATMENT_START_FRAME-TREATMENT_END_FRAME are AFTER treatment. Unlike
 #  05 (which only ever looks at frame 1), this analysis pools every
 #  frame in [1, TREATMENT_END_FRAME] into ONE CAJAL run, and splits into
 #  control vs. treatment only when building sister/cousin pairs in the
 #  notebook - not at the sampling/CAJAL stage.
-DRUG = 'vem_1uM_120hrsbefore'
+DRUG = 'vem_1uM_144hrsbefore'
 
-TREATMENT_START_FRAME = 6    # day 0 - fixed by the data, not tunable
-CONTROL_END_FRAME      = 5    # control range: frames 1-CONTROL_END_FRAME
+TREATMENT_START_FRAME = 7    # day 0 - fixed by the data, not tunable
+CONTROL_END_FRAME      = 6    # control range: frames 1-CONTROL_END_FRAME (every frame before day 0)
 TREATMENT_END_FRAME    = 11   # treatment range: frames TREATMENT_START_FRAME-TREATMENT_END_FRAME
-#  frame 6 itself is missing entirely from this dataset's raw data as
-#  of writing - select_cells.py and the notebook both skip an empty
-#  frame gracefully rather than assuming every configured frame has
-#  cells, so this needs no other code changes if frame 6 data shows up
-#  later (or any other frame in the range turns out to be missing).
+#  frame 6 (day -1, the frame immediately before day 0) itself is
+#  missing entirely from this dataset's raw data as of writing -
+#  select_cells.py and the notebook both skip an empty frame gracefully
+#  rather than assuming every configured frame has cells, so this needs
+#  no other code changes if frame 6 data shows up later (or any other
+#  frame in the range turns out to be missing).
 
 ###### Sampling
 #  No subclass stratification here - this analysis never classifies
@@ -59,7 +60,7 @@ N_POINTS   = 75    # points sampled per cell for CAJAL's icdm
 N_CLUSTERS = 20    # clusters for quantized GW
 
 ###### Pair-similarity permutation test parameters (shared/pair_similarity.py)
-#  No UMAP/PHATE here, same as vem_48hr/120hr_pretreatment: the question
+#  No UMAP/PHATE here, same as vem_48hr/144hr_pretreatment: the question
 #  below needs the real CAJAL distances directly, not a 2D projection.
 N_PERMUTATIONS = 10_000
 TEST_SEED      = 42
