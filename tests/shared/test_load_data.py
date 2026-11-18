@@ -89,7 +89,7 @@ def test_match_labels_to_metadata_works_without_a_subclass_column():
     # regression test: match_labels_to_metadata used to detect unmatched
     # rows by checking the 'subclass' column for NaN, which breaks for
     # any analysis whose `selected` has no subclass at all (e.g.
-    # vem_48hr_pretreatment's frame-1-only metadata, since
+    # vem_pretreatment's frame-1-only metadata, since
     # process_imaging_data doesn't classify frame-1 cells) - must work
     # (and still correctly raise on a genuinely unmatched cell) regardless
     labels = ['naive_frame_1_pixel_1', 'naive_frame_1_pixel_999']  # second has no match
@@ -110,7 +110,7 @@ def test_match_labels_to_metadata_carries_through_every_selected_column():
     # regression test: match_labels_to_metadata used to hardcode a 6-column
     # subset (condition, frame, pixel_id, subclass, m_label, k_label),
     # silently dropping anything else `selected` had (e.g. lin_id, needed
-    # by vem_48hr_pretreatment's frame-1 fate-mixture analysis to resolve
+    # by vem_pretreatment's frame-1 fate-mixture analysis to resolve
     # lineage_frame3_to_frame1.mat matches) - every column must now pass through
     labels = ['naive_frame_1_pixel_1']
     selected = pd.DataFrame({

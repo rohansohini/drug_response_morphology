@@ -20,9 +20,9 @@ Each analysis is self-contained under `analyses/<name>/`, with its own README co
 
 Compares cell and nuclear morphology between the `naive` and `vem_1uM` conditions over time, via a shared CAJAL embedding sampled across both conditions.
 
-### [`vem_48hr_pretreatment`](analyses/02_vem_48hr_pretreatment/README.md)
+### [`vem_pretreatment`](analyses/02_vem_pretreatment/README.md)
 
-Asks whether a cell's shape *before* vemurafenib treatment predicts what it eventually becomes, via a k-nearest-neighbor prediction test directly on CAJAL distances.
+Asks whether a cell's shape *before* vemurafenib treatment predicts what it eventually becomes, via a k-nearest-neighbor prediction test directly on CAJAL distances. Runs the same question for two pre-treatment durations (`vem_1uM_48hrsbefore`, `vem_1uM_144hrsbefore`).
 
 ### [`multi_drug_comparison`](analyses/03_multi_drug_comparison/README.md)
 
@@ -31,10 +31,6 @@ Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`,
 ### [`vem_full_timecourse`](analyses/04_vem_full_timecourse/README.md)
 
 Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
-
-### [`vem_144hr_pretreatment`](analyses/05_vem_144hr_pretreatment/README.md)
-
-The same question as `vem_48hr_pretreatment`, 6 days before treatment instead of 2: does a `vem_1uM_144hrsbefore` cell's shape before drug addition predict its day-0 descendants' eventual fate mixture?
 
 ### [`vem_144hr_lineage_relatedness`](analyses/06_vem_144hr_lineage_relatedness/README.md)
 
@@ -78,13 +74,13 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/                 # the 6 notebooks (see analyses/01_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   ├── 02_vem_48hr_pretreatment/
+│   ├── 02_vem_pretreatment/
 │   │   ├── README.md
-│   │   ├── main.py
-│   │   ├── config.py                  # dataset name, frames, paths
+│   │   ├── main.py                    # loops over both conditions in one job
+│   │   ├── config.py                  # CONDITIONS (per-duration drug name, day0_frame), frames, paths
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
-│   │   └── output/                    # generated (gitignored)
+│   │   └── output/                    # generated (gitignored): output/{condition}/...
 │   ├── 03_multi_drug_comparison/
 │   │   ├── README.md
 │   │   ├── main.py                    # one CAJAL run per modality, pooling every shared frame together
@@ -98,13 +94,6 @@ drug_response_morphology/
 │   │   ├── main.py                    # single-condition CAJAL run, every available frame
 │   │   ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
 │   │   ├── select_cells.py            # single-condition water-filled sampling, no frame cap
-│   │   ├── slurm_submit.sh
-│   │   ├── notebooks/
-│   │   └── output/                    # generated (gitignored)
-│   ├── 05_vem_144hr_pretreatment/
-│   │   ├── README.md
-│   │   ├── main.py
-│   │   ├── config.py                  # dataset name, frames, paths
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
@@ -138,7 +127,7 @@ output/
         └── plot_data.csv                # the same data each plot above is drawn from
 ```
 
-Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). The permutation-test notebooks instead export one row per permutation: `vem_48hr_pretreatment`/`vem_144hr_pretreatment` have `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality); `vem_144hr_lineage_relatedness` has `modality`, `frame_range`, `null_distance`, `sister_mean_distance`/`sister_p_value`, `cousin_mean_distance`/`cousin_p_value` (repeated on every row of their modality+range group).
+Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). The permutation-test notebooks instead export one row per permutation: `vem_pretreatment` has `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality, one `plot_data.csv` per condition); `vem_144hr_lineage_relatedness` has `modality`, `frame_range`, `null_distance`, `sister_mean_distance`/`sister_p_value`, `cousin_mean_distance`/`cousin_p_value` (repeated on every row of their modality+range group).
 
 ---
 

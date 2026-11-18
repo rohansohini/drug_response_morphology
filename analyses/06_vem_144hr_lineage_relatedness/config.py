@@ -1,11 +1,12 @@
 import os
 
 ###### This dataset
-#  vem_1uM_144hrsbefore, the same dataset 05_vem_144hr_pretreatment uses:
+#  vem_1uM_144hrsbefore, the same dataset 02_vem_pretreatment's '144hr'
+#  condition uses:
 #  frame 7 is day 0 (drug addition). Frames 1-CONTROL_END_FRAME are
 #  BEFORE treatment (~naive growth, used here as a control); frames
 #  TREATMENT_START_FRAME-TREATMENT_END_FRAME are AFTER treatment. Unlike
-#  05 (which only ever looks at frame 1), this analysis pools every
+#  02 (which only ever looks at frame 1), this analysis pools every
 #  frame in [1, TREATMENT_END_FRAME] into ONE CAJAL run, and splits into
 #  control vs. treatment only when building sister/cousin pairs in the
 #  notebook - not at the sampling/CAJAL stage.

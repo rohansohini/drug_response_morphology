@@ -34,7 +34,7 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
                   get_phate_embedding, or load_distance_matrix
         selected: an analysis's own selected-cell DataFrame (e.g. from
                   naive_vs_vem's select_cells.select_cells, or
-                  vem_48hr_pretreatment's load_all_cells.load_all_cells)
+                  vem_pretreatment's load_all_cells.load_all_cells)
                   (must have: condition, frame, pixel_id; every other
                   column - subclass, m_label, k_label, lin_id, node_id,
                   etc. - is carried through too, whatever `selected`
@@ -65,7 +65,7 @@ def match_labels_to_metadata(labels: list[str], selected: pd.DataFrame) -> pd.Da
 
     # indicator=True, rather than checking some particular column for NaN,
     # detects an unmatched row correctly regardless of which columns
-    # `selected` happens to have (some analyses, e.g. vem_48hr_pretreatment's
+    # `selected` happens to have (some analyses, e.g. vem_pretreatment's
     # frame-1-only metadata, have no 'subclass' column at all to check)
     df = df.merge(meta, on=['condition', 'frame', 'pixel_id'], how='left', indicator=True)
 

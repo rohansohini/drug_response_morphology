@@ -20,41 +20,43 @@ from shared.load_all_cells import load_all_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal, needs_recompute
 
-# config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
-# which Python resolves against the current working directory at runtime,
-# not this script's own location - if main.py is ever invoked as
-# `python analyses/05_vem_144hr_pretreatment/main.py` from somewhere else
-# (e.g. the repo root) rather than `cd`-ing into this directory first,
-# those paths would silently resolve under the WRONG directory, including
-# possibly colliding with another analysis's output. Re-anchor them to
-# this script's own directory, same as every notebook already does.
-config.OUTPUT_DIR       = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
-config.MASKS_DIR        = os.path.join(ANALYSIS_DIR, config.MASKS_DIR)
-config.CAJAL_OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.CAJAL_OUTPUT_DIR)
+# config.py's OUTPUT_DIR is a relative path, which Python resolves against
+# the current working directory at runtime, not this script's own
+# location - if main.py is ever invoked as
+# `python analyses/02_vem_pretreatment/main.py` from somewhere else (e.g.
+# the repo root) rather than `cd`-ing into this directory first, that path
+# would silently resolve under the WRONG directory, including possibly
+# colliding with another analysis's output. Re-anchor it to this script's
+# own directory, same as every notebook already does. config.output_dir()/
+# masks_dir()/cajal_output_dir() all derive from this one variable, so
+# re-anchoring it here is enough for every condition's own subtree too.
+config.OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
 
 
-def main():
-    os.makedirs(config.MASKS_DIR, exist_ok=True)
-    os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
+def process_condition(condition: str, drug: str) -> None:
+    masks_dir        = config.masks_dir(condition)
+    cajal_output_dir = config.cajal_output_dir(condition)
+    os.makedirs(masks_dir, exist_ok=True)
+    os.makedirs(cajal_output_dir, exist_ok=True)
 
     # --- step 1/3: load metadata, restrict to config.FRAMES (frame 1 only), use every available cell ---
     #  unlike naive_vs_vem, there's no sampling budget here - every
     #  has_mask=True frame-1 cell goes through CAJAL. No subclass here -
     #  process_imaging_data doesn't classify frame-1 cells (classification
     #  starts at day 0) - see shared/lineage_fate.py for each cell's fate mixture.
-    print("[1/3] Loading metadata...")
-    metadata = load_all_cells(config.metadata_csv_path(), config.FRAMES, config.DRUG)
+    print(f"[1/3] ({condition}) Loading metadata...")
+    metadata = load_all_cells(config.metadata_csv_path(condition), config.FRAMES, drug)
 
     print(f"  {len(metadata)} cells across frames {sorted(metadata['frame'].unique())}")
 
-    selected_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'selected_metadata.csv')
+    selected_path = os.path.join(cajal_output_dir, 'selected_metadata.csv')
     metadata.to_csv(selected_path, index=False)
     print(f"  Saved to {selected_path}")
 
     # --- step 2/3: extract masks for every cell ---
-    print("\n[2/3] Extracting masks...")
+    print(f"\n[2/3] ({condition}) Extracting masks...")
     extract_masks(
-        metadata, config.DRUG, config.COMBINED_MASKS_DIR, config.MASKS_DIR,
+        metadata, drug, config.COMBINED_MASKS_DIR, masks_dir,
         n_jobs=config.N_JOBS, pad_size=config.PAD_SIZE,
     )
 
@@ -63,12 +65,12 @@ def main():
     #  representation used downstream (see notebooks/01_morphology_predicts_fate.ipynb) -
     #  no UMAP/PHATE embedding is fit here, since the prediction test
     #  needs the real distances, not a 2D projection that distorts them.
-    print("\n[3/3] Running CAJAL...")
-    cell_dir = os.path.join(config.MASKS_DIR, 'cell')
-    nuc_dir  = os.path.join(config.MASKS_DIR, 'nuc')
+    print(f"\n[3/3] ({condition}) Running CAJAL...")
+    cell_dir = os.path.join(masks_dir, 'cell')
+    nuc_dir  = os.path.join(masks_dir, 'nuc')
 
-    cell_dist_csv = os.path.join(config.CAJAL_OUTPUT_DIR, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
-    nuc_dist_csv  = os.path.join(config.CAJAL_OUTPUT_DIR, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
+    cell_dist_csv = os.path.join(cajal_output_dir, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
+    nuc_dist_csv  = os.path.join(cajal_output_dir, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
 
     # figure out how many of {cell, nuc} actually need to run BEFORE
     # deciding how many cores to give each one - splitting config.N_JOBS in
@@ -94,13 +96,20 @@ def main():
 
         tasks = []
         if needs_cajal['cell']:
-            tasks.append(delayed(run_cajal)(cell_dir, config.CAJAL_OUTPUT_DIR, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+            tasks.append(delayed(run_cajal)(cell_dir, cajal_output_dir, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
         if needs_cajal['nuc']:
-            tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+            tasks.append(delayed(run_cajal)(nuc_dir, cajal_output_dir, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
 
         Parallel(n_jobs=n_tasks)(tasks)
 
-    print("\nDone.")
+
+def main():
+    for condition, info in config.CONDITIONS.items():
+        print(f"=== {condition} ({info['drug']}) ===")
+        process_condition(condition, info['drug'])
+        print()
+
+    print("Done.")
 
 
 if __name__ == '__main__':
