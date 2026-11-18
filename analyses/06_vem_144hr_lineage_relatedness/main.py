@@ -52,6 +52,7 @@ def main():
 
     rng = np.random.default_rng(config.SAMPLE_SEED)
     selected = select_cells(metadata, rng)
+    selected['sampled'] = True   # extract_masks expects this column name
 
     print(f"  Selected {len(selected)} cells total across {selected['frame'].nunique()} frames")
     for frame in sorted(selected['frame'].unique()):
