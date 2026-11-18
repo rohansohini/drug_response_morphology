@@ -21,6 +21,13 @@ def fake_loadmat(class_data):
     return _loadmat
 
 
+def fake_loadmat_by_path(path_to_data):
+    '''path_to_data: {path: {matlab_key: array}} - dispatches on the exact path given to loadmat.'''
+    def _loadmat(path):
+        return path_to_data[path]
+    return _loadmat
+
+
 def test_day0_frame_1_single_cell_per_lineage_labels_every_descendant():
     # day0_frame=1: frame 1 is the very start, so each lineage has exactly
     # one (root) cell there - 3 lineages, one divides once after frame 1
@@ -171,6 +178,70 @@ def test_before_day0_and_tracking_gap_at_day0_are_counted_and_reported_separatel
     print("PASS: before-day0 and gap-at-day0 unlabeled rows are counted correctly and reported as separate lines")
 
 
+def test_lineage_mat_path_filters_out_nan_rows_before_aligning_to_day0_cells():
+    # cloneClassification has 3 rows, but only 2 real day0 cells exist
+    # (nodes 4, 5 at frame 3) - lineage_table (same row count, same
+    # order) marks row 1 as invalid (NaN); after dropping it, the
+    # remaining 2 rows (0 and 2) must align to the 2 real day0 cells in
+    # order, same as if cloneClassification had only ever had 2 rows
+    df = pd.DataFrame({
+        'node_id':      [1, 2, 4, 5],
+        'pred_node_id': [0, 1, 2, 2],
+        'frame':        [1, 2, 3, 3],
+    })
+    class_data = np.array([[3, 1], [9, 9], [1, 2]])  # row 1 ([9,9]) should never be used
+    lineage_table = np.array([
+        [1, 1, 1],
+        [np.nan, np.nan, np.nan],
+        [1, 2, 1],
+    ])
+    paths = {
+        '/fake/clone.mat':   {'cloneClassification': class_data},
+        '/fake/lineage.mat': {'lineage_table': lineage_table},
+    }
+
+    with patch('pipeline.append_labels.loadmat', side_effect=fake_loadmat_by_path(paths)):
+        result = append_labels(df, '/fake/clone.mat', day0_frame=3, lineage_mat_path='/fake/lineage.mat')
+
+    assert list(result.loc[result['node_id'] == 4, 'm_label']) == [3]
+    assert list(result.loc[result['node_id'] == 4, 'k_label']) == [1]
+    assert list(result.loc[result['node_id'] == 5, 'm_label']) == [1]
+    assert list(result.loc[result['node_id'] == 5, 'k_label']) == [2]
+    print("PASS: lineage_mat_path filters out NaN-marked rows before aligning cloneClassification to day0 cells")
+
+
+def test_lineage_mat_path_length_mismatch_raises_clearly():
+    df = pd.DataFrame({'node_id': [1], 'pred_node_id': [0], 'frame': [1]})
+    class_data = np.array([[1, 1], [2, 2]])       # 2 rows
+    lineage_table = np.array([[1, 1, 1]])         # only 1 row - mismatched
+    paths = {
+        '/fake/clone.mat':   {'cloneClassification': class_data},
+        '/fake/lineage.mat': {'lineage_table': lineage_table},
+    }
+
+    with patch('pipeline.append_labels.loadmat', side_effect=fake_loadmat_by_path(paths)):
+        try:
+            append_labels(df, '/fake/clone.mat', day0_frame=1, lineage_mat_path='/fake/lineage.mat')
+        except AssertionError as e:
+            assert 'same length' in str(e)
+            print("PASS: a lineage_table/cloneClassification length mismatch raises clearly")
+            return
+    raise AssertionError("expected append_labels to raise when lineage_table and cloneClassification lengths differ")
+
+
+def test_lineage_mat_path_none_is_unaffected_by_nan_filtering():
+    # regression/backward-compatibility check: omitting lineage_mat_path
+    # (the default) must behave exactly as before - no filtering at all
+    df = pd.DataFrame({'node_id': [1, 2], 'pred_node_id': [0, 0], 'frame': [1, 1]})
+    class_data = np.array([[3, 1], [1, 2]])
+
+    with patch('pipeline.append_labels.loadmat', side_effect=fake_loadmat(class_data)):
+        result = append_labels(df, '/fake/path.mat', day0_frame=1)
+
+    assert list(result['m_label']) == [3, 1]
+    print("PASS: omitting lineage_mat_path leaves cloneClassification completely unfiltered, as before")
+
+
 def test_day0_frame_mismatch_raises_clearly():
     df = pd.DataFrame({
         'node_id':      [1, 2, 3],
@@ -197,5 +268,8 @@ if __name__ == '__main__':
     test_siblings_from_a_pre_day0_division_get_independent_labels()
     test_lineage_that_dies_before_day0_gets_nan_throughout()
     test_before_day0_and_tracking_gap_at_day0_are_counted_and_reported_separately()
+    test_lineage_mat_path_filters_out_nan_rows_before_aligning_to_day0_cells()
+    test_lineage_mat_path_length_mismatch_raises_clearly()
+    test_lineage_mat_path_none_is_unaffected_by_nan_filtering()
     test_day0_frame_mismatch_raises_clearly()
     print("\nAll tests passed.")

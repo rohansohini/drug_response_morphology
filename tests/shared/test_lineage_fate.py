@@ -136,6 +136,34 @@ def test_compute_frame1_fate_percentages_mixed_siblings():
         print("PASS: a frame-1 lineage's mixed day-0 descendants produce the correct percentage breakdown")
 
 
+def test_compute_frame1_fate_percentages_drops_nan_lineage_table_rows():
+    # some raw data now has lineage_table rows with no valid mapping at
+    # all (NaN) - these must be dropped before anything else, rather
+    # than crashing on .astype(int) or polluting the output. Two real
+    # rows (file_idx=1/old=5 -> lin_id 42, file_idx=2/old=9 -> lin_id 7)
+    # bracket one NaN row in the middle.
+    with tempfile.TemporaryDirectory() as tmp:
+        lineage_path, clone_path = make_fake_lineage_and_clone_files(
+            tmp,
+            [[1, 1, 5], [np.nan, np.nan, np.nan], [2, 1, 9]],
+            [[1, 1]],   # dying - both real rows reference new_clone_id_global=1
+        )
+        raw_to_global = {(1, 5): 42, (2, 9): 7}
+
+        result = lineage_fate.compute_frame1_fate_percentages(
+            lineage_path, clone_path, raw_to_global,
+            dying_m_label=DYING_M_LABEL, persisting_m_label=PERSISTING_M_LABEL,
+            prolif_m_label=PROLIF_M_LABEL,
+            slow_k_labels=SLOW_K_LABELS, fast_k_labels=FAST_K_LABELS,
+        )
+
+        assert len(result) == 2
+        assert set(result['lin_id']) == {42, 7}
+        assert (result['pct_dying'] == 1.0).all()
+        assert (result['n_day0_descendants'] == 1).all()
+        print("PASS: compute_frame1_fate_percentages drops NaN lineage_table rows without crashing or polluting the output")
+
+
 def test_compute_frame1_fate_percentages_raises_on_unresolved_lineage():
     with tempfile.TemporaryDirectory() as tmp:
         lineage_path, clone_path = make_fake_lineage_and_clone_files(tmp, [[1, 1, 99]], [[1, 1]])
@@ -179,6 +207,7 @@ if __name__ == '__main__':
     test_build_raw_to_global_lin_id_matches_real_make_master_ids_offsetting()
     test_compute_frame1_fate_percentages_single_descendant_is_100_percent()
     test_compute_frame1_fate_percentages_mixed_siblings()
+    test_compute_frame1_fate_percentages_drops_nan_lineage_table_rows()
     test_compute_frame1_fate_percentages_raises_on_unresolved_lineage()
     test_compute_frame1_fate_percentages_raises_on_out_of_range_new_clone_id()
     print("\nAll tests passed.")

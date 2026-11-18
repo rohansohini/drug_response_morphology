@@ -3,7 +3,8 @@ import pandas as pd
 from scipy.io import loadmat
 
 
-def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.DataFrame:
+def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int,
+                   lineage_mat_path: str = None) -> pd.DataFrame:
     '''
     Append lineage classification labels to the cell DataFrame.
 
@@ -47,15 +48,31 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
     yet) and no row ever needs NaN - every cell is a day-0 cell or one of
     its descendants.
 
+    Some raw data (for a pre-treatment-baseline condition, day0_frame
+    != 1) now has MORE cloneClassification rows than there are real
+    day-0 track-table cells - the matching lineage_frame{day0_frame}_
+    to_frame1.mat (same row count, same row order as cloneClassification)
+    marks which rows are real with a non-NaN row and which aren't (NaN).
+    Pass lineage_mat_path to filter cloneClassification down to only the
+    real rows before anything else below - the row-by-row correspondence
+    this function otherwise assumes (row i == the i-th smallest day0_frame
+    node_id) would silently misalign cells to the wrong label without it.
+
     The classification has two levels:
         m_label: broad class (1 = dying, 2 = persister, 3 = proliferator)
         k_label: sub-class within m_label (1-6), 18 labels total (3 x 6)
 
     Inputs:
-        df:          cell track DataFrame (must have: node_id, pred_node_id, frame)
-        labels_path: path to clone_kmeans_id.mat file
-        day0_frame:  frame number (1-indexed) the drug was added on for
-                     this condition - see config.DAY0_FRAMES
+        df:               cell track DataFrame (must have: node_id,
+                          pred_node_id, frame)
+        labels_path:      path to clone_kmeans_id.mat file
+        day0_frame:       frame number (1-indexed) the drug was added on
+                          for this condition - see config.DAY0_FRAMES
+        lineage_mat_path: path to this drug's own lineage_frame
+                          {day0_frame}_to_frame1.mat, or None for a
+                          condition with day0_frame == 1 (no pre-
+                          treatment baseline, so no such file exists).
+                          See above for what this is used for.
     Outputs:
         df: input DataFrame with m_label and k_label columns added (NaN
             for any cell before day0_frame, or unreachable from a
@@ -63,7 +80,23 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
             above)
     '''
     df         = df.copy()
-    class_data = pd.DataFrame(loadmat(labels_path)['cloneClassification'])
+    class_data = loadmat(labels_path)['cloneClassification']
+
+    if lineage_mat_path is not None:
+        lineage_table = loadmat(lineage_mat_path)['lineage_table']
+        assert len(lineage_table) == len(class_data), (
+            f"lineage_table has {len(lineage_table)} row(s) but cloneClassification has "
+            f"{len(class_data)} - expected them to be the same length, in the same row order, so "
+            f"lineage_table's NaN rows can mark which cloneClassification rows aren't real day-0 cells"
+        )
+        valid = ~np.isnan(lineage_table).any(axis=1)
+        n_dropped = int((~valid).sum())
+        if n_dropped > 0:
+            print(f"  Dropping {n_dropped}/{len(class_data)} cloneClassification row(s) with no "
+                  f"matching (non-NaN) lineage_table row")
+        class_data = class_data[valid]
+
+    class_data = pd.DataFrame(class_data)
 
     # cells present at day0_frame, in ascending node_id order - this is
     # the same order cloneClassification's rows were computed in. Each is
@@ -76,9 +109,12 @@ def append_labels(df: pd.DataFrame, labels_path: str, day0_frame: int) -> pd.Dat
     # expected to have exactly one row per cell present at day 0.
     assert len(day0_node_ids) == len(class_data), (
         f"{len(day0_node_ids)} cell(s) present at frame {day0_frame} (day 0) does not exactly match "
-        f"cloneClassification length ({len(class_data)}) - expected exactly one row per cell at day 0. "
-        f"A mismatch means day0_frame is probably wrong for this drug (see config.DAY0_FRAMES), or "
-        f"cloneClassification was computed over a different frame than these track tables."
+        f"(possibly already NaN-filtered) cloneClassification length ({len(class_data)}) - expected "
+        f"exactly one row per cell at day 0. A mismatch means day0_frame is probably wrong for this "
+        f"drug (see config.DAY0_FRAMES), cloneClassification was computed over a different frame "
+        f"than these track tables, or (if lineage_mat_path was given) its NaN filtering didn't fully "
+        f"resolve the count - check that lineage_table's row order truly corresponds to "
+        f"cloneClassification's."
     )
 
     node_to_row = {node_id: row for row, node_id in enumerate(day0_node_ids)}

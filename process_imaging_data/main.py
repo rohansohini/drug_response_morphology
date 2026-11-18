@@ -43,6 +43,13 @@ def process_drug(drug: str, drug_dir: str, day0_frame: int) -> None:
     # --- paths ---
     seg_mask_dir = drug_dir
     labels_path  = os.path.join(drug_dir, 'clone_kmeans_id.mat')
+    #  only a pre-treatment-baseline condition (day0_frame != 1) has one
+    #  of these - day0_frame == 1 means frame 1 IS day 0, so there's no
+    #  earlier lineage to map back to, and no such file exists. See
+    #  append_labels.py's own docstring for what this is used for.
+    lineage_mat_path = (
+        os.path.join(drug_dir, f'lineage_frame{day0_frame}_to_frame1.mat') if day0_frame != 1 else None
+    )
 
     # --- step 1: discover and load cell track tables ---
     print("\n[1/7] Discovering and loading track tables...")
@@ -54,7 +61,7 @@ def process_drug(drug: str, drug_dir: str, day0_frame: int) -> None:
     # --- step 2: append lineage classification labels ---
     print("\n[2/7] Appending classification labels...")
     t = time.time()
-    df = append_labels(df, labels_path, day0_frame)
+    df = append_labels(df, labels_path, day0_frame, lineage_mat_path=lineage_mat_path)
     print(f"  Done ({time.time()-t:.1f}s)")
 
     # --- step 3: load nuclear data ---

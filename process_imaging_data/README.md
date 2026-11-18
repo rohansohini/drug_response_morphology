@@ -40,6 +40,7 @@ Raw data is **not** stored inside this repo. Each drug condition's data lives wh
 ```
 {drug_dir}/
 ├── clone_kmeans_id.mat
+├── lineage_frame{N}_to_frame1.mat     # only for a pre-treatment-baseline condition (DAY0_FRAMES[drug] != 1)
 ├── Cropped_XX/
 │   ├── track_table_*.mat
 │   └── segmentation_info_*.mat
@@ -54,6 +55,7 @@ Where:
 - `track_table_*.mat`: cell track data for that folder's track
 - `segmentation_info_*.mat`: nuclear segmentation data for that folder's track
 - `clone_kmeans_id.mat`: lineage classification labels (`cloneClassification`), one row per lineage. Column 0 is the broad class (`m_label`), column 1 is the subclass (`k_label`).
+- `lineage_frame{N}_to_frame1.mat` (`N` = this condition's own `DAY0_FRAMES[drug]`): only present for a pre-treatment-baseline condition - see "Pre-treatment-baseline conditions" below.
 - `Output_Segmentation/Transmission_region_XX/`: cell segmentation masks, one folder per track
 - `Transmission_YY_masks.tiff`: segmentation mask, one per frame
 
@@ -119,12 +121,18 @@ Most drug conditions image starting exactly at day 0 (the frame the drug is adde
 
 Classification (`clone_kmeans_id.mat`'s `cloneClassification`) is assigned per **cell present at day 0**, not per lineage. A lineage can already have divided multiple times during any pre-treatment imaging: e.g. 3 cells at frame 1 can expand to 100 cells by day 0 at frame 3, and each of those 100 day-0 cells gets its *own* distinct label, independent of its siblings, even though all 100 share the same original lineage (`lin_id`). This matters: `cloneClassification` is **not** indexed by `lin_id` at all.
 
-- `cloneClassification` has exactly one row per cell present at `frame == day0_frame`. Row `i` (0-indexed) is the day-0 cell with the `i`-th smallest `node_id`, in flat ascending order, not grouped by lineage.
+- `cloneClassification` has exactly one row per cell present at `frame == day0_frame` - after any NaN-filtering below, if this condition has that. Row `i` (0-indexed) is the day-0 cell with the `i`-th smallest `node_id`, in flat ascending order, not grouped by lineage.
 - Each day-0 cell's label is propagated forward to every one of its own descendants, via the `node_id`/`pred_node_id` parent-child chain. A descendant of a *different* day-0 sibling, even one sharing the same `lin_id`, gets that sibling's own (different) label instead.
 - A cell strictly before day 0 gets `NaN` for both `m_label` and `k_label`. Its fate isn't classified until day 0, and a shared pre-day0 ancestor can fan out into several differently-labeled day-0 descendants, so no single label could correctly apply to it anyway.
 - A lineage that dies out before ever reaching day0_frame gets `NaN` throughout: no day-0 cell, no classification.
 
 For any condition where `DAY0_FRAMES[drug] == 1` (the drug is added on the very first imaged frame), frame 1 is the very start of imaging, so every lineage has exactly one cell there (no divisions have happened yet). Every cell is either a day-0 cell itself or a descendant of one, so no row ever ends up `NaN`.
+
+### Pre-treatment-baseline conditions: filtering `cloneClassification` with `lineage_frame{N}_to_frame1.mat`
+
+For a condition with a pre-treatment baseline (`DAY0_FRAMES[drug] != 1`, e.g. `vem_48hrsbefore`, `vem_144hrsbefore`), some raw data has `cloneClassification` with *more* rows than there are real day-0 cells in the track table. The matching `lineage_frame{day0_frame}_to_frame1.mat` (same row count, same row order as `cloneClassification`, under that condition's own `DRUG_DIRS` folder) marks which rows are real with a non-`NaN` row and which aren't (`NaN`) - `append_labels.py` drops the `NaN`-marked rows from `cloneClassification` first, and only then does the usual `i`-th-smallest-`node_id` alignment above. `main.py` passes this path in automatically whenever `day0_frame != 1`; a condition with `day0_frame == 1` has no such file (there's no earlier lineage to map back to) and skips this filtering entirely.
+
+This same `lineage_frame{N}_to_frame1.mat` is also used downstream by `shared/lineage_fate.py` (see `analyses/02_vem_48hr_pretreatment`/`analyses/05_vem_144hr_pretreatment`) for a different purpose - resolving each frame-1 lineage's fate-mixture percentage - and filters out the same `NaN` rows there too, independently.
 
 **Every key in `DRUG_DIRS` must have a matching entry in `DAY0_FRAMES`.** `main.py` asserts this up front and fails loudly if one's missing, since getting `day0_frame` wrong for a condition silently mis-pairs labels with cells rather than erroring in an obvious way.
 

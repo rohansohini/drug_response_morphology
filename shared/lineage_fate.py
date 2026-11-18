@@ -1,6 +1,7 @@
 import os
 import sys
 
+import numpy as np
 import pandas as pd
 from scipy.io import loadmat
 
@@ -78,7 +79,9 @@ def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path
         lineage_mat_path:      path to this dataset's own
                                lineage_frame{N}_to_frame1.mat
                                (var.lineage_table: file_idx,
-                               new_clone_id_global, old_clone_id_frame1)
+                               new_clone_id_global, old_clone_id_frame1) -
+                               any row with a NaN in it is dropped before
+                               use (see below)
         clone_kmeans_mat_path: path to clone_kmeans_id.mat
                                (cloneClassification - new_clone_id_global
                                is the 1-indexed row number into it)
@@ -93,6 +96,19 @@ def compute_frame1_fate_percentages(lineage_mat_path: str, clone_kmeans_mat_path
             pct_dying, pct_persisting, pct_slow_prolif, pct_fast_prolif]
     '''
     lineage_table = loadmat(lineage_mat_path)['lineage_table']
+
+    # some raw data now has lineage_table rows with no valid mapping at
+    # all (NaN) - e.g. a cloneClassification entry that never resolved
+    # to a frame-1 ancestor. Drop those before anything else: left in,
+    # .astype(int) below would either raise or silently produce garbage
+    # from a NaN value.
+    n_total = len(lineage_table)
+    valid = ~np.isnan(lineage_table).any(axis=1)
+    lineage_table = lineage_table[valid]
+    n_dropped = n_total - len(lineage_table)
+    if n_dropped > 0:
+        print(f"  Dropping {n_dropped}/{n_total} lineage_table row(s) with no valid (NaN) mapping")
+
     lineage_df = pd.DataFrame(
         lineage_table, columns=['file_idx', 'new_clone_id_global', 'old_clone_id_frame1']
     ).astype(int)
