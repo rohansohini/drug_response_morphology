@@ -14,11 +14,11 @@ DRUG = 'vem_1uM_120hrsbefore'
 TREATMENT_START_FRAME = 6    # day 0 - fixed by the data, not tunable
 CONTROL_END_FRAME      = 5    # control range: frames 1-CONTROL_END_FRAME
 TREATMENT_END_FRAME    = 11   # treatment range: frames TREATMENT_START_FRAME-TREATMENT_END_FRAME
-#  frame 11 itself is missing entirely from this dataset's raw data as
+#  frame 6 itself is missing entirely from this dataset's raw data as
 #  of writing - select_cells.py and the notebook both skip an empty
 #  frame gracefully rather than assuming every configured frame has
-#  cells, so bumping TREATMENT_END_FRAME back up later (if frame 11
-#  data shows up, or to look further) needs no other code changes.
+#  cells, so this needs no other code changes if frame 6 data shows up
+#  later (or any other frame in the range turns out to be missing).
 
 ###### Sampling
 #  No subclass stratification here - this analysis never classifies

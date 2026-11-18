@@ -19,7 +19,7 @@ def select_cells(metadata: pd.DataFrame, rng: np.random.Generator) -> pd.DataFra
     chance, not biased towards keeping more of them (see config.py).
 
     A frame with zero has_mask=True cells (e.g. frame
-    config.TREATMENT_END_FRAME itself, currently missing from this
+    config.TREATMENT_START_FRAME itself, currently missing from this
     dataset) is skipped gracefully rather than erroring - it just
     contributes no cells and no sister/cousin pairs from that frame.
 
