@@ -26,7 +26,7 @@ PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_d
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
 #  this condition's RAW data root - same value as process_imaging_data's
-#  own config.DRUG_DIRS['vem_144hrsbefore'] (not the processed_data output
+#  own config.DRUG_DIRS['vem_1uM_144hrsbefore'] (not the processed_data output
 #  above). Needed to read raw track_table_*.mat (to resolve
 #  lineage_frame7_to_frame1.mat's track-local IDs into global lin_ids -
 #  see shared/lineage_fate.py) and the two .mat files below, which live
@@ -38,7 +38,7 @@ RAW_DRUG_DIR = '/projects/b1042/GoyalLab/sohini/drug_response_morphology/raw_dat
 #  lineage_table: file_idx, new_clone_id_global, old_clone_id_frame1 - see
 #  shared/lineage_fate.py for exactly how these relate day-0 (frame 7)
 #  cells back to their frame-1 lineage. Same internal field names as
-#  vem_48hrsbefore's own lineage_frame3_to_frame1.mat - only the filename
+#  vem_1uM_48hrsbefore's own lineage_frame3_to_frame1.mat - only the filename
 #  (and which frame it points back from) differs between datasets.
 LINEAGE_MAT_PATH      = os.path.join(RAW_DRUG_DIR, 'lineage_frame7_to_frame1.mat')
 #  cloneClassification - same file process_imaging_data's append_labels.py

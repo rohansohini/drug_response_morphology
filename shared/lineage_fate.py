@@ -41,7 +41,7 @@ def build_raw_to_global_lin_id(drug_dir: str) -> dict[tuple[int, int], int]:
 
     Inputs:
         drug_dir: this condition's raw data root - same value as
-                 process_imaging_data's config.DRUG_DIRS['vem_48hrsbefore']
+                 process_imaging_data's config.DRUG_DIRS['vem_1uM_48hrsbefore']
                  (see config.RAW_DRUG_DIR)
     Outputs:
         {(track, raw_lin_id): global_lin_id}

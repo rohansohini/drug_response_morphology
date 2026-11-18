@@ -25,7 +25,7 @@ PROCESSED_DATA_DIR        = os.path.join(PROCESS_IMAGING_DATA_ROOT, 'processed_d
 COMBINED_MASKS_DIR        = os.path.join(PROCESSED_DATA_DIR, 'combined_masks')
 
 #  this condition's RAW data root - same value as process_imaging_data's
-#  own config.DRUG_DIRS['vem_48hrsbefore'] (not the processed_data output
+#  own config.DRUG_DIRS['vem_1uM_48hrsbefore'] (not the processed_data output
 #  above). Needed to read raw track_table_*.mat (to resolve
 #  lineage_frame3_to_frame1.mat's track-local IDs into global lin_ids -
 #  see lineage_fate.py) and the two .mat files below, which live

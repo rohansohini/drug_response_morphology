@@ -27,7 +27,7 @@ def make_metadata(frames, n_per_frame, pixel_id_start=1, has_mask_fraction=1.0, 
 
 
 def test_samples_up_to_the_configured_size_per_frame():
-    metadata = make_metadata(range(1, 26), n_per_frame=2000, rng=np.random.default_rng(0))
+    metadata = make_metadata(range(1, 12), n_per_frame=2000, rng=np.random.default_rng(0))
 
     original = config.SAMPLE_SIZE_PER_FRAME
     config.SAMPLE_SIZE_PER_FRAME = 100
@@ -36,8 +36,8 @@ def test_samples_up_to_the_configured_size_per_frame():
     finally:
         config.SAMPLE_SIZE_PER_FRAME = original
 
-    assert len(selected) == 25 * 100, f"expected 25 frames x 100 = 2500, got {len(selected)}"
-    for frame in range(1, 26):
+    assert len(selected) == 11 * 100, f"expected 11 frames x 100 = 1100, got {len(selected)}"
+    for frame in range(1, 12):
         assert (selected['frame'] == frame).sum() == 100
     print("PASS: select_cells samples exactly SAMPLE_SIZE_PER_FRAME per frame")
 
@@ -59,14 +59,14 @@ def test_uses_everything_available_when_fewer_than_the_configured_size():
 def test_respects_treatment_end_frame_cap():
     # cells exist well past config.TREATMENT_END_FRAME, but only frames
     # 1-TREATMENT_END_FRAME should ever be sampled
-    metadata = make_metadata(range(1, 41), n_per_frame=30)
+    metadata = make_metadata(range(1, 21), n_per_frame=30)
 
-    assert config.TREATMENT_END_FRAME == 25, "test assumes the real config.TREATMENT_END_FRAME is 25"
+    assert config.TREATMENT_END_FRAME == 11, "test assumes the real config.TREATMENT_END_FRAME is 11"
 
     selected = select_cells(metadata, rng=np.random.default_rng(0))
 
-    assert selected['frame'].max() == 25, (
-        f"expected frames capped at config.TREATMENT_END_FRAME (25), got max frame {selected['frame'].max()}"
+    assert selected['frame'].max() == 11, (
+        f"expected frames capped at config.TREATMENT_END_FRAME (11), got max frame {selected['frame'].max()}"
     )
     print("PASS: select_cells caps the usable frame range at config.TREATMENT_END_FRAME")
 
@@ -82,7 +82,7 @@ def test_a_missing_frame_is_skipped_not_an_error():
     metadata = pd.concat([
         make_metadata(range(1, 6), n_per_frame=30),
         pd.DataFrame({'frame': [6], 'pixel_id': [99999], 'has_mask': [False]}),
-        make_metadata(range(7, 26), n_per_frame=30, pixel_id_start=200_000),
+        make_metadata(range(7, 12), n_per_frame=30, pixel_id_start=200_000),
     ], ignore_index=True)
 
     selected = select_cells(metadata, rng=np.random.default_rng(0))
