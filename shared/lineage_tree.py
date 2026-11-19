@@ -110,10 +110,72 @@ def _build_one_tree(lin_id, lin_df: pd.DataFrame) -> list[Segment]:
     return segments
 
 
+def _descendants_at_depth(segment: Segment, depth: int) -> list[Segment]:
+    '''
+    Every segment reached by exactly `depth` divisions below `segment`
+    (depth=0 is `segment` itself). Stops wherever a branch hasn't
+    divided that many more times (yet, within the frame range the tree
+    was built from) and contributes nothing from that branch, rather
+    than erroring - "hasn't divided enough times yet" is the expected
+    case for a branch observed near the edge of a frame window, not a
+    bug.
+    '''
+    if depth == 0:
+        return [segment]
+    descendants = []
+    for child in (segment.left_child, segment.right_child):
+        if child is not None:
+            descendants.extend(_descendants_at_depth(child, depth - 1))
+    return descendants
+
+
+def find_relative_pairs(segments: list[Segment], degree: int) -> list[tuple[Segment, Segment]]:
+    '''
+    Every pair of segments that share a common ancestor exactly `degree`
+    generations back, reached via the ancestor's TWO DIFFERENT children
+    (not nested within one side - that would make them parent/child or
+    aunt/niece, not same-generation relatives). Generalizes
+    find_sister_pairs (degree=1: common parent) and find_cousin_pairs
+    (degree=2: common grandparent) to arbitrarily distant relatives
+    (degree=3: common great-grandparent, i.e. "second cousins"; etc).
+
+    A grandparent (or further ancestor) whose two sides divided at
+    different frames, or different numbers of times so far, still
+    contributes whatever pairs both sides actually have at this depth -
+    relatives are never required to share a frame or a generation count
+    in wall-clock time, only in tree topology.
+
+    Inputs:
+        segments: from build_segments (or any subset/pool of trees -
+                 relatives are found purely from each segment's own
+                 left_child/right_child, so trees never interfere)
+        degree:   generations back to the shared ancestor (>= 1; 1 is
+                 sisters, the shallowest possible relationship)
+    Outputs:
+        pairs: [(relative_a, relative_b), ...] - every cross-combination
+               of the ancestor's left-side degree-(degree-1) descendants
+               with its right-side ones (up to 4 at degree=2, more at
+               higher degrees if more branches survived that deep)
+    '''
+    assert degree >= 1, f"degree must be >= 1 (got {degree}) - degree 1 (sisters) is the shallowest relationship"
+
+    pairs = []
+    for s in segments:
+        if s.left_child is None or s.right_child is None:
+            continue
+        left_descendants  = _descendants_at_depth(s.left_child, degree - 1)
+        right_descendants = _descendants_at_depth(s.right_child, degree - 1)
+        for a in left_descendants:
+            for b in right_descendants:
+                pairs.append((a, b))
+    return pairs
+
+
 def find_sister_pairs(segments: list[Segment]) -> list[tuple[Segment, Segment]]:
     '''
     Every pair of segments born from the same division - i.e. every
     segment with both children present contributes exactly one pair.
+    See find_relative_pairs (degree=1) for the general case.
 
     Inputs:
         segments: from build_segments (or any subset/pool of trees -
@@ -122,11 +184,7 @@ def find_sister_pairs(segments: list[Segment]) -> list[tuple[Segment, Segment]]:
     Outputs:
         pairs: [(left_child, right_child), ...]
     '''
-    return [
-        (s.left_child, s.right_child)
-        for s in segments
-        if s.left_child is not None and s.right_child is not None
-    ]
+    return find_relative_pairs(segments, degree=1)
 
 
 def find_cousin_pairs(segments: list[Segment]) -> list[tuple[Segment, Segment]]:
@@ -135,24 +193,74 @@ def find_cousin_pairs(segments: list[Segment]) -> list[tuple[Segment, Segment]]:
     grandparent, different parents) - i.e. both of a division's two
     children must themselves have gone on to divide; every cross
     between one side's children and the other's counts (up to 4 pairs
-    per grandparent). A grandparent whose two children divided at
-    different frames still contributes pairs - cousins are not
-    required to share a frame (their parents' divisions can land at
-    different times).
+    per grandparent). See find_relative_pairs (degree=2) for the
+    general case.
 
     Inputs:
         segments: from build_segments
     Outputs:
         pairs: [(cousin_a, cousin_b), ...]
     '''
-    pairs = []
-    for s in segments:
-        if s.left_child is None or s.right_child is None:
-            continue
-        left, right = s.left_child, s.right_child
-        left_children  = [c for c in (left.left_child, left.right_child) if c is not None]
-        right_children = [c for c in (right.left_child, right.right_child) if c is not None]
-        for lc in left_children:
-            for rc in right_children:
-                pairs.append((lc, rc))
-    return pairs
+    return find_relative_pairs(segments, degree=2)
+
+
+def observations_in_range(segment: Segment, frame_range: tuple[int, int], label_to_index: dict) -> list[int]:
+    '''
+    A segment's own (frame, pixel_id) observations, restricted to a
+    frame range AND to whichever ones actually got a CAJAL embedding -
+    returned as indices into the distance matrix label_to_index was
+    built from.
+
+    Inputs:
+        segment:        a Segment (from build_segments, or one of
+                        find_relative_pairs' returned pair members)
+        frame_range:    (lo, hi) frame numbers, inclusive
+        label_to_index: {(frame, pixel_id): row/col index into a CAJAL
+                        distance matrix} - e.g. built from
+                        shared.cajal.embed.load_distance_matrix's
+                        labels via shared.load_data.parse_label
+    Outputs:
+        indices: distance-matrix indices for this segment's own
+                 observations within frame_range that survived CAJAL
+                 subsampling
+    '''
+    lo, hi = frame_range
+    return [
+        label_to_index[(frame, pixel_id)]
+        for frame, pixel_id in segment.observations
+        if lo <= frame <= hi and (frame, pixel_id) in label_to_index
+    ]
+
+
+def real_index_pairs(pairs: list[tuple[Segment, Segment]], frame_range: tuple[int, int],
+                      label_to_index: dict) -> list[tuple[int, int]]:
+    '''
+    Every (index_a, index_b) cross-combination of a surviving
+    observation from one side of a relative pair (e.g. from
+    find_relative_pairs) with a surviving observation from the other -
+    every combination available, not just one per pair, since relatives
+    are not required to share a frame (one side's own track can run
+    longer than the other's; a cousin pair's parents, or a deeper
+    ancestor's two sides, can divide at different times).
+
+    Inputs:
+        pairs:          [(segment_a, segment_b), ...] - e.g. from
+                        find_relative_pairs
+        frame_range:    (lo, hi) frame numbers, inclusive
+        label_to_index: see observations_in_range
+    Outputs:
+        index_pairs: [(i, j), ...] indices into the distance matrix
+                     label_to_index was built from
+    '''
+    index_pairs = []
+    for segment_a, segment_b in pairs:
+        idx_a = observations_in_range(segment_a, frame_range, label_to_index)
+        idx_b = observations_in_range(segment_b, frame_range, label_to_index)
+        index_pairs.extend((i, j) for i in idx_a for j in idx_b)
+    return index_pairs
+
+
+def pool_in_range(label_to_index: dict, frame_range: tuple[int, int]) -> list[int]:
+    '''Every CAJAL-embedded cell (any lineage relationship) within a frame range - a null distribution is drawn from this.'''
+    lo, hi = frame_range
+    return [idx for (frame, pixel_id), idx in label_to_index.items() if lo <= frame <= hi]

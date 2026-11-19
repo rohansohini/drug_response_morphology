@@ -7,7 +7,10 @@ import sys
 import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.lineage_tree import build_segments, find_sister_pairs, find_cousin_pairs
+from shared.lineage_tree import (
+    build_segments, find_sister_pairs, find_cousin_pairs, find_relative_pairs,
+    observations_in_range, real_index_pairs, pool_in_range,
+)
 
 
 def make_df(rows):
@@ -135,6 +138,99 @@ def test_independent_lin_ids_never_produce_cross_tree_pairs():
     print("PASS: segments from independent lin_ids never pair with each other")
 
 
+def test_find_relative_pairs_degree_1_and_2_match_find_sister_and_cousin_pairs():
+    df = make_df([
+        (1, 1, 1, 0, 1), (1, 2, 2, 1, 1), (1, 2, 3, 1, 2),
+        (1, 3, 4, 2, 10), (1, 3, 5, 2, 11), (1, 4, 6, 3, 20), (1, 4, 7, 3, 21),
+    ])
+    segments = build_segments(df)
+
+    assert find_relative_pairs(segments, degree=1) == find_sister_pairs(segments)
+    assert find_relative_pairs(segments, degree=2) == find_cousin_pairs(segments)
+    print("PASS: find_relative_pairs(degree=1/2) match find_sister_pairs/find_cousin_pairs exactly")
+
+
+def test_find_relative_pairs_degree_3_finds_second_cousins():
+    # root -> L/R; L -> L1/L2, R -> R1/R2 (cousins at degree 2); only L1
+    # and R1 go on to divide again, into L1a/L1b and R1a/R1b - these are
+    # "second cousins" (degree 3, common great-grandparent = root)
+    df = make_df([
+        (1, 1, 1, 0, 1),
+        (1, 2, 2, 1, 1), (1, 2, 3, 1, 2),          # L, R
+        (1, 3, 4, 2, 10), (1, 3, 5, 2, 11),        # L1, L2
+        (1, 3, 6, 3, 20), (1, 3, 7, 3, 21),        # R1, R2
+        (1, 4, 8, 4, 100), (1, 4, 9, 4, 101),      # L1a, L1b (L2 never divides again)
+        (1, 4, 10, 6, 200), (1, 4, 11, 6, 201),    # R1a, R1b (R2 never divides again)
+    ])
+    segments = build_segments(df)
+
+    second_cousin_pairs = find_relative_pairs(segments, degree=3)
+    assert len(second_cousin_pairs) == 4, (
+        f"expected 4 second-cousin pairs (L1a/L1b x R1a/R1b), got {len(second_cousin_pairs)}"
+    )
+    obs_pairs = {frozenset([a.observations[0], b.observations[0]]) for a, b in second_cousin_pairs}
+    expected = {
+        frozenset([(4, 100), (4, 200)]), frozenset([(4, 100), (4, 201)]),
+        frozenset([(4, 101), (4, 200)]), frozenset([(4, 101), (4, 201)]),
+    }
+    assert obs_pairs == expected
+    print("PASS: find_relative_pairs(degree=3) finds second cousins, skipping branches that haven't divided that deep yet")
+
+
+def test_find_relative_pairs_rejects_degree_below_1():
+    try:
+        find_relative_pairs([], degree=0)
+    except AssertionError as e:
+        assert 'degree' in str(e)
+        print("PASS: find_relative_pairs rejects degree < 1")
+        return
+    raise AssertionError("expected find_relative_pairs to raise on degree=0")
+
+
+def test_observations_in_range_filters_by_frame_and_cajal_survival():
+    segment = build_segments(make_df([(1, 1, 1, 0, 1), (1, 2, 2, 1, 1), (1, 3, 3, 2, 1)]))[0]
+    # frame 3's observation never made it into label_to_index (e.g. it
+    # wasn't sampled for CAJAL) - must be silently skipped, not KeyError
+    label_to_index = {(1, 1): 0, (2, 1): 1}
+
+    assert observations_in_range(segment, (1, 2), label_to_index) == [0, 1]
+    assert observations_in_range(segment, (2, 3), label_to_index) == [1]
+    assert observations_in_range(segment, (1, 3), label_to_index) == [0, 1], (
+        "frame 3's observation has no entry in label_to_index and must be dropped, not raise"
+    )
+    print("PASS: observations_in_range restricts to a frame range and drops observations that never got a CAJAL embedding")
+
+
+def test_real_index_pairs_cross_combines_surviving_observations_on_both_sides():
+    df = make_df([
+        (1, 1, 1, 0, 1),
+        (1, 2, 2, 1, 1), (1, 2, 3, 1, 2),            # A, B (the one division)
+        (1, 3, 4, 2, 10), (1, 3, 5, 3, 20),          # A, B both keep tracking into frame 3
+        (1, 4, 6, 4, 10), (1, 4, 7, 5, 20),          # ... and frame 4
+    ])
+    segments = build_segments(df)
+    sister_pairs = find_sister_pairs(segments)
+    assert len(sister_pairs) == 1, "expected exactly one division (A, B), each continuing as a chain afterward"
+
+    # frame 2's observations are deliberately left out, so restricting to
+    # frames 3-4 below exercises both the frame-range filter AND the
+    # "this frame wasn't sampled" filter at once
+    label_to_index = {(3, 10): 0, (4, 10): 1, (3, 20): 2, (4, 20): 3}
+
+    index_pairs = real_index_pairs(sister_pairs, (3, 4), label_to_index)
+    assert set(index_pairs) == {(0, 2), (0, 3), (1, 2), (1, 3)}, (
+        "expected every combination of A's 2 surviving observations with B's 2, not just one pair"
+    )
+    print("PASS: real_index_pairs cross-combines every surviving observation on each side, not just one pair per relationship")
+
+
+def test_pool_in_range_filters_by_frame_only():
+    label_to_index = {(1, 1): 0, (2, 1): 1, (3, 1): 2}
+    assert sorted(pool_in_range(label_to_index, (1, 2))) == [0, 1]
+    assert sorted(pool_in_range(label_to_index, (1, 3))) == [0, 1, 2]
+    print("PASS: pool_in_range keeps every embedded cell within a frame range, regardless of lineage")
+
+
 def test_division_with_more_than_two_daughters_raises_clearly():
     df = make_df([
         (1, 1, 1, 0, 1),
@@ -171,6 +267,12 @@ if __name__ == '__main__':
     test_cousins_require_both_parents_to_have_divided()
     test_pred_node_id_zero_mid_tree_folds_into_the_same_root_segment()
     test_independent_lin_ids_never_produce_cross_tree_pairs()
+    test_find_relative_pairs_degree_1_and_2_match_find_sister_and_cousin_pairs()
+    test_find_relative_pairs_degree_3_finds_second_cousins()
+    test_find_relative_pairs_rejects_degree_below_1()
+    test_observations_in_range_filters_by_frame_and_cajal_survival()
+    test_real_index_pairs_cross_combines_surviving_observations_on_both_sides()
+    test_pool_in_range_filters_by_frame_only()
     test_division_with_more_than_two_daughters_raises_clearly()
     test_predecessor_appearing_after_successor_raises_clearly()
     print("\nAll tests passed.")
