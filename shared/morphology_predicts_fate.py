@@ -139,10 +139,18 @@ def plot_permutation_test(observed_errors, null_errors, p_value, title=None):
     fig, ax = plt.subplots(figsize=(6, 5))
 
     ax.hist(null_errors, bins=50, density=True, color='lightgrey', edgecolor='grey', alpha=0.8, label='null (random reassignment)')
-    ax.hist(observed_errors, bins=50, density=True, color='tab:red', edgecolor='darkred', alpha=0.5, label='real')
 
+    # the p-value goes into the 'real' legend entry itself, not a
+    # separate floating ax.text annotation - a second, independently
+    # placed text box has no way to know where matplotlib's own
+    # legend(loc='best') will land, and the two can end up directly on
+    # top of each other depending on the data's shape (confirmed
+    # directly). Folding it into the legend (same pattern
+    # shared/pair_similarity.py already uses) means there's only one UI
+    # element, so it can never overlap with itself.
     p_label = f'< {np.finfo(float).tiny:.1e}' if p_value == 0 else f'= {p_value:.4g}'
-    ax.text(0.97, 0.95, f'Mann-Whitney U\np {p_label}', transform=ax.transAxes, ha='right', va='top')
+    ax.hist(observed_errors, bins=50, density=True, color='tab:red', edgecolor='darkred', alpha=0.5,
+            label=f'real (Mann-Whitney U p {p_label})')
 
     ax.set_xlabel('prediction error')
     ax.set_ylabel('density')
