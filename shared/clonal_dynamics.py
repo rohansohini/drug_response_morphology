@@ -144,9 +144,9 @@ def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_d
     '''
     For each subclass, pick the n_clones tightest-clustered lin_ids (see
     pick_tightest_clones) and paint them onto embedded_df's embedding
-    (see plot_clones_on_embedding) - one PDF/SVG figure per subclass:
+    (see plot_clones_on_embedding) - one PNG/SVG figure per subclass:
 
-    output_dir/{file_prefix}_{subclass}.pdf, output_dir/svgs/{file_prefix}_{subclass}.svg
+    output_dir/{file_prefix}_{subclass}.png, output_dir/svgs/{file_prefix}_{subclass}.svg
 
     Also writes one combined output_dir/{file_prefix}_clone_summary.csv
     (every chosen clone, every subclass, with its n_cells/
@@ -201,7 +201,7 @@ def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_d
             embedded_df, clone_dfs, lin_ids, colors[:len(lin_ids)], embedding_label,
             f'{title_prefix} - {subclass} clones', n_panels=n_clones,
         )
-        fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}.pdf'), bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}.png'), dpi=200, bbox_inches='tight')
         fig.savefig(os.path.join(svg_dir, f'{file_prefix}_{subclass}.svg'), bbox_inches='tight')
         display(fig)
         plt.close(fig)

@@ -93,18 +93,7 @@ def test_legend_entries_and_order_stay_identical_across_frames_with_different_gr
     print("PASS: legend entries and their order stay identical across frames, even as different groups dip below min_group_size")
 
 
-def _pdf_page_count(path):
-    # no pdf-parsing library is in this project's dependencies - count
-    # page objects directly in the raw bytes instead of adding one. Each
-    # page object is "/Type /Page" (no trailing word char); the one
-    # "/Type /Pages" tree-root object has a trailing 's' so \b excludes it.
-    import re
-    with open(path, 'rb') as f:
-        data = f.read()
-    return len(re.findall(rb'/Type\s*/Page\b', data))
-
-
-def test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
+def test_export_kde_by_frame_writes_gif_and_one_svg_per_frame_no_pdf(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_test'):
     import shutil
     if os.path.exists(tmp_dir):
         shutil.rmtree(tmp_dir)
@@ -124,22 +113,19 @@ def test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame(tmp_dir='/tmp/clau
     svg_dir = os.path.join(tmp_dir, 'svgs')
     expected_svgs = {f'cell_umap_frame_0{f}.svg' for f in [1, 2, 3]}
 
-    # PDF and GIF sit directly in tmp_dir (no subfolder) - only the SVGs,
-    # since there are many, get their own subfolder
-    assert set(os.listdir(tmp_dir)) == {'cell_umap.pdf', 'cell_umap.gif', 'svgs'}, \
-        f"expected cell_umap.pdf, cell_umap.gif, and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
+    # GIF sits directly in tmp_dir (no subfolder) - only the SVGs, since
+    # there are many, get their own subfolder. No PDF at all: a
+    # multi-page PDF was the only other way to page through every
+    # frame in one file, and the GIF already does that.
+    assert set(os.listdir(tmp_dir)) == {'cell_umap.gif', 'svgs'}, \
+        f"expected cell_umap.gif and svgs/ directly in {tmp_dir} (no PDF), got {os.listdir(tmp_dir)}"
     assert set(os.listdir(svg_dir)) == expected_svgs, f"got {os.listdir(svg_dir)}"
-
-    pdf_path = os.path.join(tmp_dir, 'cell_umap.pdf')
-    assert os.path.getsize(pdf_path) > 0, "cell_umap.pdf is empty"
-    assert _pdf_page_count(pdf_path) == 3, \
-        f"expected 3 pages (one per frame) in the combined PDF, got {_pdf_page_count(pdf_path)}"
 
     for f in expected_svgs:
         assert os.path.getsize(os.path.join(svg_dir, f)) > 0, f"{f} is empty"
 
     shutil.rmtree(tmp_dir)
-    print("PASS: export_kde_by_frame writes a flat PDF+GIF, with only SVGs in their own subfolder")
+    print("PASS: export_kde_by_frame writes a flat GIF, with only SVGs in their own subfolder, and no PDF")
 
 
 def test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_gif_test'):
@@ -178,7 +164,7 @@ def test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps(
     print("PASS: export_kde_by_frame's GIF has one frame per input frame, uniform size, and the right fps")
 
 
-def test_export_kde_writes_a_single_flat_pdf_and_svg():
+def test_export_kde_writes_a_single_flat_png_and_svg():
     tmp_dir = '/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_kde_test'
     import shutil
     if os.path.exists(tmp_dir):
@@ -194,14 +180,14 @@ def test_export_kde_writes_a_single_flat_pdf_and_svg():
                tmp_dir, 'cell_umap', 'UMAP')
 
     svg_dir = os.path.join(tmp_dir, 'svgs')
-    assert set(os.listdir(tmp_dir)) == {'cell_umap.pdf', 'svgs'}, \
-        f"expected cell_umap.pdf and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
+    assert set(os.listdir(tmp_dir)) == {'cell_umap.png', 'svgs'}, \
+        f"expected cell_umap.png and svgs/ directly in {tmp_dir} (no PDF), got {os.listdir(tmp_dir)}"
     assert os.listdir(svg_dir) == ['cell_umap.svg']
-    assert os.path.getsize(os.path.join(tmp_dir, 'cell_umap.pdf')) > 0
+    assert os.path.getsize(os.path.join(tmp_dir, 'cell_umap.png')) > 0
     assert os.path.getsize(os.path.join(svg_dir, 'cell_umap.svg')) > 0
 
     shutil.rmtree(tmp_dir)
-    print("PASS: export_kde writes a single flat PDF + one SVG in its own subfolder")
+    print("PASS: export_kde writes a single flat PNG + one SVG in its own subfolder, no PDF")
 
 
 def test_kde_contours_are_unfilled_outlines_at_default_levels():
@@ -413,9 +399,9 @@ def test_weighted_kde_legend_shows_total_weight():
 if __name__ == '__main__':
     test_legend_shows_every_group_but_only_draws_contours_for_well_sampled_ones()
     test_legend_entries_and_order_stay_identical_across_frames_with_different_group_sizes()
-    test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame()
+    test_export_kde_by_frame_writes_gif_and_one_svg_per_frame_no_pdf()
     test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps()
-    test_export_kde_writes_a_single_flat_pdf_and_svg()
+    test_export_kde_writes_a_single_flat_png_and_svg()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_embedding_with_kde_applies_explicit_xlim_ylim()
     test_export_kde_by_frame_uses_identical_axes_across_frames()

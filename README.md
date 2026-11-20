@@ -57,7 +57,7 @@ drug_response_morphology/
 │   │   └── embed.py                   # loads the distance matrix; UMAP/PHATE on it
 │   ├── classify.py                    # m_label/k_label -> subclass (scheme passed in by each analysis's own config.py)
 │   ├── load_data.py                   # merges embedding coordinates / distance-matrix labels with metadata; exports a notebook's combined plot_data.csv
-│   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PDF export
+│   ├── density_plots.py               # shared KDE-over-embedding plotting (hard-label and weighted), PNG/SVG/GIF export
 │   ├── representative_shapes.py       # k-means regions over an embedding + each region's real representative cell shape
 │   ├── morphology_predicts_fate.py    # KNN prediction of a per-cell mixture from real (GW) morphological distance + permutation test
 │   ├── lineage_fate.py                # frame-1 lineage -> day-0 fate-mixture percentages (from a lineage_frame{N}_to_frame1.mat mapping)
@@ -122,9 +122,9 @@ output/
 ├── masks/, cajal_output/              # extracted masks, CAJAL distances, UMAP/PHATE embeddings
 └── plots/
     └── {notebook_name}/
-        ├── {modality}_{embedding}.pdf   # one combined, multi-page PDF, e.g. cell_umap.pdf
-        ├── {modality}_{embedding}.gif   # only for a per-frame (time-series) plot: the same pages, animated at 2fps
-        ├── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
+        ├── {modality}_{embedding}.png   # a single static plot - omitted for a per-frame (time-series) plot, which has no single combined image
+        ├── {modality}_{embedding}.gif   # only for a per-frame (time-series) plot: every frame, animated at 2fps
+        ├── svgs/                        # one SVG per frame (time-series), or one SVG per static plot, e.g. cell_umap_frame_01.svg / cell_umap.svg
         └── plot_data.csv                # the same data each plot above is drawn from
 ```
 

@@ -240,7 +240,7 @@ def _synthetic_embedded_df_and_distances(seed=0):
     return embedded_df, dist_matrix, label_to_index
 
 
-def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass():
+def test_export_clones_by_subclass_writes_png_svg_and_summary_csv_per_subclass():
     embedded_df, dist_matrix, label_to_index = _synthetic_embedded_df_and_distances()
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -249,17 +249,17 @@ def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
             n_clones=2, min_embedded_cells=10, subclasses=['persisting', 'slow_prolif', 'fast_prolif', 'dying'],
         )
 
-        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting.pdf'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting.png'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_persisting.svg'))
-        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_fast_prolif.pdf'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_fast_prolif.png'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_fast_prolif.svg'))
 
         # 'dying' has ZERO eligible clones (its only candidate is below
-        # min_embedded_cells) - it must still get a PDF/SVG (all-placeholder
+        # min_embedded_cells) - it must still get a PNG/SVG (all-placeholder
         # panels), not be silently skipped, so every requested subclass's
         # image stays present and the same size as its siblings
-        dying_pdf_path = os.path.join(tmp_dir, 'cell_umap_dying.pdf')
-        assert os.path.isfile(dying_pdf_path), "a subclass with zero eligible clones must still get a placeholder PDF"
+        dying_png_path = os.path.join(tmp_dir, 'cell_umap_dying.png')
+        assert os.path.isfile(dying_png_path), "a subclass with zero eligible clones must still get a placeholder PNG"
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_dying.svg'))
 
         summary_csv_path = os.path.join(tmp_dir, 'cell_umap_clone_summary.csv')
@@ -283,7 +283,7 @@ def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
 
         assert len(combined) == len(on_disk)
 
-    print("PASS: export_clones_by_subclass picks the tightest clones per subclass, writes a PDF+SVG per subclass, "
+    print("PASS: export_clones_by_subclass picks the tightest clones per subclass, writes a PNG+SVG per subclass, "
           "and a combined summary CSV - handling a subclass with fewer than n_clones eligible clones")
 
 
@@ -311,6 +311,6 @@ if __name__ == '__main__':
     test_plot_clones_on_embedding_runs_without_error()
     test_plot_clones_on_embedding_handles_a_single_clone()
     test_plot_clones_on_embedding_always_renders_n_panels_the_same_size()
-    test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
+    test_export_clones_by_subclass_writes_png_svg_and_summary_csv_per_subclass()
     test_clone_colors_do_not_reuse_any_tab_color_or_region_color()
     print("\nAll tests passed.")

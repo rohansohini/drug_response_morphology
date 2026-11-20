@@ -233,8 +233,8 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     and save - as two SEPARATE figures/files, not one combined plot (see
     plot_embedding_by_region and plot_representative_shapes):
 
-    output_dir/{file_prefix}_embedding.pdf, output_dir/svgs/{file_prefix}_embedding.svg
-    output_dir/{file_prefix}_shapes.pdf,    output_dir/svgs/{file_prefix}_shapes.svg
+    output_dir/{file_prefix}_embedding.png, output_dir/svgs/{file_prefix}_embedding.svg
+    output_dir/{file_prefix}_shapes.png,    output_dir/svgs/{file_prefix}_shapes.svg
 
     Also displays both figures directly in the notebook's output, so you
     don't have to open the saved files just to see them.
@@ -257,13 +257,13 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     os.makedirs(svg_dir, exist_ok=True)
 
     embedding_fig = plot_embedding_by_region(df, embedding_label, title)
-    embedding_fig.savefig(os.path.join(output_dir, f'{file_prefix}_embedding.pdf'), bbox_inches='tight')
+    embedding_fig.savefig(os.path.join(output_dir, f'{file_prefix}_embedding.png'), dpi=200, bbox_inches='tight')
     embedding_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_embedding.svg'), bbox_inches='tight')
     display(embedding_fig)
     plt.close(embedding_fig)
 
     shapes_fig = plot_representative_shapes(shapes, title, n_regions)
-    shapes_fig.savefig(os.path.join(output_dir, f'{file_prefix}_shapes.pdf'), bbox_inches='tight')
+    shapes_fig.savefig(os.path.join(output_dir, f'{file_prefix}_shapes.png'), dpi=200, bbox_inches='tight')
     shapes_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_shapes.svg'), bbox_inches='tight')
     display(shapes_fig)
     plt.close(shapes_fig)

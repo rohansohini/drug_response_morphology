@@ -2,7 +2,6 @@ import io
 import os
 
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from IPython.display import display
 from PIL import Image
@@ -59,7 +58,7 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
     # entry only on frames where a group dips below min_group_size (the
     # original behavior) made the legend's entries - and their order -
     # shift between frames/pages of the same multi-frame export, which
-    # is confusing in a GIF/PDF sequence meant to be directly comparable.
+    # is confusing in a GIF/SVG sequence meant to be directly comparable.
     legend_handles = []
     for group, color in group_colors.items():
         subset = df[df[group_col] == group]
@@ -119,7 +118,7 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
     # one handle per group in group_colors, ALWAYS, in that same fixed
     # order - see plot_embedding_with_kde's own comment on why (a legend
     # whose entries/order shift between frames of the same multi-frame
-    # export is confusing in a GIF/PDF sequence meant to be directly
+    # export is confusing in a GIF/SVG sequence meant to be directly
     # comparable)
     legend_handles = []
     for group, color in group_colors.items():
@@ -147,15 +146,15 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
 
 def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1, fps=2):
     '''
-    One combined, multi-page PDF, one SVG per frame (in their own
-    svgs/ subfolder, since there are many of those but only one PDF),
-    and one animated GIF stepping through every frame in order - each
-    page/frame a plot_embedding_with_kde call restricted to that frame's
-    cells. Shared by every analysis notebook - they differ only in which
-    df/group_col/colors/output_dir they pass in, and which embedding's
-    coordinates df holds.
+    One SVG per frame (in its own svgs/ subfolder) and one animated GIF
+    stepping through every frame in order - each frame a
+    plot_embedding_with_kde call restricted to that frame's cells. No
+    combined multi-page PDF: the GIF already covers paging through every
+    frame, so a second, PDF-only way to do the same thing wasn't adding
+    anything. Shared by every analysis notebook - they differ only in
+    which df/group_col/colors/output_dir they pass in, and which
+    embedding's coordinates df holds.
 
-    output_dir/{file_prefix}.pdf
     output_dir/{file_prefix}.gif
     output_dir/svgs/{file_prefix}_frame_NN.svg
 
@@ -178,7 +177,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
         group_col:       column to contour per (e.g. 'condition' or 'subclass')
         group_colors:    {group_value: color}
         output_dir:      directory to save into (and create a svgs/ subfolder in)
-        file_prefix:     filename prefix (e.g. 'cell_umap' -> 'cell_umap.pdf', 'cell_umap_frame_01.svg')
+        file_prefix:     filename prefix (e.g. 'cell_umap' -> 'cell_umap.gif', 'cell_umap_frame_01.svg')
         embedding_label: see plot_embedding_with_kde, purely cosmetic
                          (axis labels only, e.g. 'UMAP' or 'PHATE')
         title_prefix:    prefix for each plot's title (defaults to file_prefix if not given)
@@ -198,8 +197,6 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(svg_dir, exist_ok=True)
 
-    pdf_path = os.path.join(output_dir, f'{file_prefix}.pdf')
-
     x_min, x_max = df['dim_0'].min(), df['dim_0'].max()
     y_min, y_max = df['dim_1'].min(), df['dim_1'].max()
     x_pad = (x_max - x_min) * 0.05
@@ -208,31 +205,29 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     ylim  = (y_min - y_pad, y_max + y_pad)
 
     gif_frames = []
-    with PdfPages(pdf_path) as pdf:
-        for frame in frames:
-            subset = df[df['frame'] == frame]
-            fig, ax = plt.subplots(figsize=(6, 6))
-            plot_embedding_with_kde(
-                subset, group_col, group_colors, ax,
-                f'{title_prefix}: frame {frame}', embedding_label, min_group_size=min_group_size,
-                levels=levels, bw_adjust=bw_adjust, xlim=xlim, ylim=ylim,
-            )
-            pdf.savefig(fig, bbox_inches='tight')
-            fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
+    for frame in frames:
+        subset = df[df['frame'] == frame]
+        fig, ax = plt.subplots(figsize=(6, 6))
+        plot_embedding_with_kde(
+            subset, group_col, group_colors, ax,
+            f'{title_prefix}: frame {frame}', embedding_label, min_group_size=min_group_size,
+            levels=levels, bw_adjust=bw_adjust, xlim=xlim, ylim=ylim,
+        )
+        fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
 
-            # deliberately NOT bbox_inches='tight' here - a 'tight' crop's
-            # pixel size can vary slightly frame to frame (e.g. legend
-            # text width changes with each group's own n=), which would
-            # give the GIF mismatched frame sizes. The fixed figsize/dpi
-            # above already guarantees every frame renders to the exact
-            # same pixel dimensions.
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png', dpi=120)
-            buf.seek(0)
-            gif_frames.append(Image.open(buf).convert('RGB'))
+        # deliberately NOT bbox_inches='tight' here - a 'tight' crop's
+        # pixel size can vary slightly frame to frame (e.g. legend
+        # text width changes with each group's own n=), which would
+        # give the GIF mismatched frame sizes. The fixed figsize/dpi
+        # above already guarantees every frame renders to the exact
+        # same pixel dimensions.
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=120)
+        buf.seek(0)
+        gif_frames.append(Image.open(buf).convert('RGB'))
 
-            display(fig)   # show it in the notebook's own output, not just save it to disk
-            plt.close(fig)
+        display(fig)   # show it in the notebook's own output, not just save it to disk
+        plt.close(fig)
 
     gif_path = os.path.join(output_dir, f'{file_prefix}.gif')
     gif_frames[0].save(
@@ -240,20 +235,20 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
         duration=1000 / fps, loop=0,
     )
 
-    print(f"  Saved {len(frames)} frame(s) to {pdf_path}, {svg_dir}, and {gif_path} ({fps} fps)")
+    print(f"  Saved {len(frames)} frame(s) to {svg_dir} and {gif_path} ({fps} fps)")
 
 
 def export_kde(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title=None,
                 min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1):
     '''
-    One PDF and one SVG (in its own svgs/ subfolder) from a single
+    One PNG and one SVG (in its own svgs/ subfolder) from a single
     plot_embedding_with_kde call. Use this when there's no natural
     "frame" dimension to page through - e.g. comparing groups pooled
     across a RANGE of frames (each group's own window), rather than one
     group per individual frame - see export_kde_by_frame for the paged
     case.
 
-    output_dir/{file_prefix}.pdf
+    output_dir/{file_prefix}.png
     output_dir/svgs/{file_prefix}.svg
 
     Also displays the figure directly in the notebook's output, so you
@@ -283,7 +278,7 @@ def export_kde(df, group_col, group_colors, output_dir, file_prefix, embedding_l
         df, group_col, group_colors, ax, title, embedding_label,
         min_group_size=min_group_size, levels=levels, bw_adjust=bw_adjust,
     )
-    fig.savefig(os.path.join(output_dir, f'{file_prefix}.pdf'), bbox_inches='tight')
+    fig.savefig(os.path.join(output_dir, f'{file_prefix}.png'), dpi=200, bbox_inches='tight')
     fig.savefig(os.path.join(svg_dir, f'{file_prefix}.svg'), bbox_inches='tight')
     display(fig)
     plt.close(fig)
