@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from shared.density_plots import plot_embedding_with_kde, export_kde_by_frame, export_kde, plot_embedding_with_weighted_kde
 
 
-def test_legend_shows_well_sampled_groups_only():
+def test_legend_shows_every_group_but_only_draws_contours_for_well_sampled_ones():
     # regression test: seaborn's kdeplot(fill=True, label=...) does NOT
     # attach a legend-visible label in this seaborn/matplotlib version
     # combo (confirmed directly: the resulting collection gets an
@@ -22,6 +22,11 @@ def test_legend_shows_well_sampled_groups_only():
     # convention) - plot_embedding_with_kde must build the legend from
     # manual proxy patches instead, or it silently renders with no legend
     # at all.
+    #
+    # A group below min_group_size must still show up in the legend (so
+    # the legend's entries/order stay identical across every frame of a
+    # multi-frame export, even on frames where a group's count dips
+    # below the threshold) - it just doesn't get a drawn contour line.
     rng = np.random.default_rng(0)
     df = pd.DataFrame({
         'dim_0': np.concatenate([rng.normal(0, 1, 50), rng.normal(5, 1, 50), rng.normal(0, 1, 2)]),
@@ -40,12 +45,52 @@ def test_legend_shows_well_sampled_groups_only():
     assert legend is not None, "expected a legend to be created"
     labels = [t.get_text() for t in legend.get_texts()]
 
-    assert len(labels) == 2, f"expected exactly 2 legend entries (rare_group has < min_group_size), got {labels}"
+    assert len(labels) == 3, f"expected all 3 groups in the legend (even rare_group, below min_group_size), got {labels}"
     assert any('naive' in l for l in labels)
     assert any('A1_1uM_vem' in l for l in labels)
-    assert not any('rare_group' in l for l in labels)
+    assert any('rare_group' in l for l in labels)
 
-    print("PASS: legend shows exactly the well-sampled groups, with real labels (not empty/auto-generated)")
+    from matplotlib.contour import QuadContourSet
+    contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
+    assert len(contour_sets) == 2, \
+        f"expected only 2 drawn contours (naive, A1_1uM_vem) - rare_group is below min_group_size, got {len(contour_sets)}"
+
+    print("PASS: legend shows every group (real labels, not empty/auto-generated); only well-sampled groups get a drawn contour")
+
+
+def test_legend_entries_and_order_stay_identical_across_frames_with_different_group_sizes():
+    # the exact symptom reported: across a multi-frame export, whichever
+    # group dipped below min_group_size on a given frame used to vanish
+    # from (and reshuffle) that frame's legend - the legend must instead
+    # show the SAME entries in the SAME order on every frame, regardless
+    # of which group(s) happen to be under-sampled that frame
+    group_colors = {'naive': 'tab:blue', 'vem': 'tab:red', 'rare': 'tab:green'}
+
+    rng = np.random.default_rng(0)
+    # frame A: 'rare' is well-sampled; frame B: 'vem' is under-sampled instead
+    df_a = pd.DataFrame({
+        'dim_0': rng.normal(0, 1, 10 + 10 + 10), 'dim_1': rng.normal(0, 1, 30),
+        'condition': ['naive'] * 10 + ['vem'] * 10 + ['rare'] * 10,
+    })
+    df_b = pd.DataFrame({
+        'dim_0': rng.normal(0, 1, 10 + 1 + 10), 'dim_1': rng.normal(0, 1, 21),
+        'condition': ['naive'] * 10 + ['vem'] * 1 + ['rare'] * 10,
+    })
+
+    labels_per_frame = []
+    for df in (df_a, df_b):
+        fig, ax = plt.subplots()
+        plot_embedding_with_kde(df, 'condition', group_colors, ax, 'test title', 'UMAP', min_group_size=5)
+        legend = ax.get_legend()
+        # strip the "(n=...)" suffix - only the group identity/order must match, not the count
+        labels_per_frame.append([t.get_text().split(' (n=')[0] for t in legend.get_texts()])
+        plt.close(fig)
+
+    assert labels_per_frame[0] == labels_per_frame[1] == ['naive', 'vem', 'rare'], (
+        f"expected identical legend entries/order on every frame regardless of which group is "
+        f"under-sampled that frame, got {labels_per_frame}"
+    )
+    print("PASS: legend entries and their order stay identical across frames, even as different groups dip below min_group_size")
 
 
 def _pdf_page_count(path):
@@ -328,12 +373,21 @@ def test_weighted_kde_skips_a_group_below_min_total_weight():
         {'dying': 'tab:red', 'persisting': 'tab:blue'}, ax, 'test title', 'UMAP', min_total_weight=5,
     )
 
+    # both still appear in the legend (so entries/order stay constant
+    # across frames - see plot_embedding_with_kde's own equivalent test) -
+    # 'persisting' just gets no drawn contour
     legend = ax.get_legend()
     labels = [t.get_text() for t in legend.get_texts()]
-    assert len(labels) == 1 and 'dying' in labels[0], \
-        f"expected only 'dying' in the legend (persisting's total weight is below min_total_weight), got {labels}"
+    assert len(labels) == 2, f"expected both groups in the legend even though persisting is below min_total_weight, got {labels}"
+    assert any('dying' in l for l in labels)
+    assert any('persisting' in l for l in labels)
 
-    print("PASS: a group whose total weight is below min_total_weight is skipped entirely")
+    from matplotlib.contour import QuadContourSet
+    contour_sets = [c for c in ax.collections if isinstance(c, QuadContourSet)]
+    assert len(contour_sets) == 1, \
+        f"expected only 1 drawn contour (dying) - persisting is below min_total_weight, got {len(contour_sets)}"
+
+    print("PASS: a group whose total weight is below min_total_weight still appears in the legend, just with no drawn contour")
 
 
 def test_weighted_kde_legend_shows_total_weight():
@@ -357,7 +411,8 @@ def test_weighted_kde_legend_shows_total_weight():
 
 
 if __name__ == '__main__':
-    test_legend_shows_well_sampled_groups_only()
+    test_legend_shows_every_group_but_only_draws_contours_for_well_sampled_ones()
+    test_legend_entries_and_order_stay_identical_across_frames_with_different_group_sizes()
     test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame()
     test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps()
     test_export_kde_writes_a_single_flat_pdf_and_svg()

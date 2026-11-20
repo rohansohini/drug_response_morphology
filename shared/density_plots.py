@@ -52,9 +52,18 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
     # that matplotlib's legend ignores by convention) - build the legend from
     # manual proxy handles instead of relying on kdeplot's own label kwarg,
     # which silently produces an empty legend otherwise.
+    #
+    # One handle per group in group_colors, ALWAYS, in that same fixed
+    # order - regardless of whether this particular call's df has enough
+    # of that group to actually draw a contour for. Skipping a legend
+    # entry only on frames where a group dips below min_group_size (the
+    # original behavior) made the legend's entries - and their order -
+    # shift between frames/pages of the same multi-frame export, which
+    # is confusing in a GIF/PDF sequence meant to be directly comparable.
     legend_handles = []
     for group, color in group_colors.items():
         subset = df[df[group_col] == group]
+        legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5, label=f'{group} (n={len(subset)})'))
         if len(subset) < min_group_size:
             continue
         sns.kdeplot(
@@ -62,7 +71,6 @@ def plot_embedding_with_kde(df, group_col, group_colors, ax, title, embedding_la
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
             bw_adjust=bw_adjust,
         )
-        legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5, label=f'{group} (n={len(subset)})'))
 
     ax.set_title(title)
     ax.set_xlabel(f'{embedding_label} 1')
@@ -108,10 +116,17 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
     '''
     ax.scatter(df['dim_0'], df['dim_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
 
+    # one handle per group in group_colors, ALWAYS, in that same fixed
+    # order - see plot_embedding_with_kde's own comment on why (a legend
+    # whose entries/order shift between frames of the same multi-frame
+    # export is confusing in a GIF/PDF sequence meant to be directly
+    # comparable)
     legend_handles = []
     for group, color in group_colors.items():
         weights = df[weight_cols[group]].to_numpy()
         total_weight = weights.sum()
+        legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5,
+                                      label=f'{group} (total weight={total_weight:.1f})'))
         if total_weight < min_total_weight:
             continue
         sns.kdeplot(
@@ -119,8 +134,6 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
             color=color, fill=False, levels=list(levels), linewidths=1.5, zorder=2,
             bw_adjust=bw_adjust,
         )
-        legend_handles.append(Line2D([0], [0], color=color, linewidth=1.5,
-                                      label=f'{group} (total weight={total_weight:.1f})'))
 
     ax.set_title(title)
     ax.set_xlabel(f'{embedding_label} 1')
