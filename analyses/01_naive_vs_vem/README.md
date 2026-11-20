@@ -5,14 +5,13 @@ Compares cell and nuclear morphology between the `naive` and `vem_1uM` condition
 1. **Selects cells** for CAJAL from both conditions, every subclass (dying, persisting, slow proliferator, fast proliferator), restricted to frames present in *both* conditions and <= `config.MAX_FRAME` (13 - `process_imaging_data` itself no longer caps frames, so this analysis caps its own range explicitly rather than silently absorbing whatever else becomes available upstream), sampled with an 80/20 vem/naive budget split (`select_cells.py` / `shared/allocation.py`).
 2. **Runs CAJAL** once per modality (cell, nucleus) on the combined selection.
 3. **Fits UMAP and PHATE directly on the CAJAL distance matrix** (`metric='precomputed'`/`knn_dist='precomputed_distance'`).
-4. **Seven notebooks** read those shared embeddings:
+4. **Six notebooks** read those shared embeddings:
    - `00_representative_shapes.ipynb`: k-means clusters the full embedding into a few regions and shows each region's actual representative cell shape
    - `01_umap_by_condition_over_time.ipynb`: every cell, every subclass, KDE per condition
    - `02_proliferators_vem_vs_naive.ipynb`: proliferators only (`m_label == 3`), KDE per condition
    - `03_vem_subclasses_over_time.ipynb`: vem only, KDE per subclass
    - `04_prolif_vs_persisters.ipynb`: three-way comparison (naive proliferators / vem proliferators / vem persisters), KDE per group, paged by frame like the others
    - `05_naive_early_vs_vem_late.ipynb`: naive pooled across an early frame window vs. vem pooled across a late frame window (both windows are notebook-level constants), one single plot - not paged by frame, since each group already spans several frames
-   - `06_clonal_dynamics.ipynb`: for each subclass, finds the 3 vem clones (lineages, by `lin_id`) with the most TRUE segmented cells in `vem_1uM_metadata.csv` - among those with enough cells in the CAJAL-embedded sample to actually plot - and paints each one's own cells onto the embedding in its own color, against the whole vem population in grey (`shared/clonal_dynamics.py`, same layout as Figure 1g of Shaffer et al., "Diverse clonal fates emerge upon drug treatment of homogeneous cancer cells")
 
 ---
 

@@ -11,89 +11,124 @@ import pandas as pd
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from shared.clonal_dynamics import (
-    CLONE_COLORS, pick_top_clones, plot_clones_on_embedding, export_clones_by_subclass,
+    CLONE_COLORS, pick_tightest_clones, plot_clones_on_embedding, export_clones_by_subclass,
 )
 
 
-def _full_df(lin_id_counts: dict):
-    rows = []
-    for lin_id, n in lin_id_counts.items():
-        rows.extend({'lin_id': lin_id} for _ in range(n))
-    return pd.DataFrame(rows)
-
-
 def _embedded_df(lin_id_cells: dict):
-    # lin_id_cells: {lin_id: [(frame, dim_0, dim_1), ...]}
+    # lin_id_cells: {lin_id: [(frame, pixel_id, dim_0, dim_1), ...]}
     rows = []
     for lin_id, cells in lin_id_cells.items():
-        for frame, dim_0, dim_1 in cells:
-            rows.append({'lin_id': lin_id, 'frame': frame, 'dim_0': dim_0, 'dim_1': dim_1})
+        for frame, pixel_id, dim_0, dim_1 in cells:
+            rows.append({'lin_id': lin_id, 'frame': frame, 'pixel_id': pixel_id, 'dim_0': dim_0, 'dim_1': dim_1})
     return pd.DataFrame(rows)
 
 
-def test_pick_top_clones_ranks_by_true_count_not_embedded_count():
-    # lin_id 'B' has fewer embedded cells than 'A' but far more TRUE
-    # cells - it must still win, since "most segmented cells" means the
-    # true population, not an artifact of the random CAJAL sampling budget
-    full_df = _full_df({'A': 50, 'B': 100})
+def _block_distance_matrix(n, blocks):
+    '''
+    Build an (n, n) symmetric distance matrix with zero diagonal, where
+    every (i, j) pair within the same `blocks` group gets a small
+    distance (tight cluster) and every cross-group pair gets a large one
+    (loose) - lets a test construct exactly the "tight vs. loose" clones
+    pick_tightest_clones is supposed to tell apart.
+
+    Inputs:
+        n:      matrix size
+        blocks: {group_label: (indices, within_group_distance)} - indices
+                not covered by any block default to being "loose" with
+                everything (large distance)
+    '''
+    dist = np.full((n, n), 10.0)
+    np.fill_diagonal(dist, 0.0)
+    for indices, within_distance in blocks.values():
+        for i in indices:
+            for j in indices:
+                if i != j:
+                    dist[i, j] = within_distance
+    return dist
+
+
+def test_pick_tightest_clones_prefers_lower_mean_pairwise_distance():
+    # lin_id 'tight' has a small mean pairwise distance among its own
+    # cells, lin_id 'loose' has a large one (both have the same cell
+    # count, so count can't be driving the result) - 'tight' must win
     embedded_df = _embedded_df({
-        'A': [(f, 0, 0) for f in range(20)],   # 20 embedded cells
-        'B': [(f, 0, 0) for f in range(6)],    # only 6 embedded cells, but both are >= floor
+        'tight': [(f, f, 0, 0) for f in range(10)],
+        'loose': [(f, 100 + f, 0, 0) for f in range(10)],
+    })
+    label_to_index = {}
+    for i, (frame, pixel_id) in enumerate(zip(embedded_df['frame'], embedded_df['pixel_id'])):
+        label_to_index[(frame, pixel_id)] = i
+
+    tight_indices = [label_to_index[(f, f)] for f in range(10)]
+    loose_indices = [label_to_index[(f, 100 + f)] for f in range(10)]
+    dist_matrix = _block_distance_matrix(len(embedded_df), {
+        'tight': (tight_indices, 0.1),
+        'loose': (loose_indices, 9.0),
     })
 
-    top_lin_ids, summary = pick_top_clones(full_df, embedded_df, n_clones=2, min_embedded_cells=5)
+    top_lin_ids, summary = pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=5)
 
-    assert top_lin_ids == ['B', 'A'], f"expected B (100 true cells) ranked above A (50), got {top_lin_ids}"
-    assert summary.loc['B', 'true_n_cells'] == 100
-    assert summary.loc['B', 'embedded_n_cells'] == 6
+    assert top_lin_ids == ['tight', 'loose'], f"expected 'tight' ranked above 'loose', got {top_lin_ids}"
+    assert summary.loc['tight', 'mean_pairwise_distance'] < summary.loc['loose', 'mean_pairwise_distance']
 
-    print("PASS: pick_top_clones ranks by TRUE cell count, not embedded-sample count")
+    print("PASS: pick_tightest_clones ranks by lowest mean pairwise CAJAL distance (tightest cluster first)")
 
 
-def test_pick_top_clones_filters_by_min_embedded_cells():
-    # lin_id 'C' is the biggest TRUE clone by far, but has only 2 embedded
-    # cells (below the floor) - it must be excluded entirely, since a
-    # clone with no plottable points can't be painted onto the embedding
-    full_df = _full_df({'A': 50, 'C': 1000})
+def test_pick_tightest_clones_filters_by_min_embedded_cells():
+    # 'small' is tighter than 'big' but has too few embedded cells to be
+    # eligible at all - it must be excluded regardless of how tight it is
     embedded_df = _embedded_df({
-        'A': [(f, 0, 0) for f in range(10)],
-        'C': [(0, 0, 0), (0, 0, 0)],   # only 2 embedded cells
+        'small': [(f, f, 0, 0) for f in range(3)],
+        'big':   [(f, 100 + f, 0, 0) for f in range(10)],
+    })
+    label_to_index = {}
+    for i, (frame, pixel_id) in enumerate(zip(embedded_df['frame'], embedded_df['pixel_id'])):
+        label_to_index[(frame, pixel_id)] = i
+
+    small_indices = [label_to_index[(f, f)] for f in range(3)]
+    big_indices = [label_to_index[(f, 100 + f)] for f in range(10)]
+    dist_matrix = _block_distance_matrix(len(embedded_df), {
+        'small': (small_indices, 0.01),
+        'big':   (big_indices, 5.0),
     })
 
-    top_lin_ids, summary = pick_top_clones(full_df, embedded_df, n_clones=2, min_embedded_cells=5)
+    top_lin_ids, summary = pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=5)
 
-    assert top_lin_ids == ['A'], f"expected only A to be eligible (C is below the embedded-cell floor), got {top_lin_ids}"
+    assert top_lin_ids == ['big'], f"expected only 'big' to be eligible ('small' is below the cell-count floor), got {top_lin_ids}"
 
-    print("PASS: pick_top_clones excludes a clone below min_embedded_cells, however big its true count")
+    print("PASS: pick_tightest_clones excludes a clone below min_embedded_cells, however tight it is")
 
 
-def test_pick_top_clones_breaks_ties_by_frame_span():
-    # A and B have identical true AND embedded cell counts, but B's
-    # embedded cells are spread across more distinct frames - B should
-    # win the tie
-    full_df = _full_df({'A': 10, 'B': 10})
+def test_pick_tightest_clones_skips_labels_missing_from_the_distance_matrix():
+    # a cell in embedded_df with no matching (frame, pixel_id) in
+    # label_to_index (e.g. CAJAL subsampled it out) must simply not count
+    # towards that lin_id's eligibility or mean distance, not raise
     embedded_df = _embedded_df({
-        'A': [(0, 0, 0)] * 8,                       # all 8 embedded cells on frame 0
-        'B': [(f, 0, 0) for f in range(8)],         # 8 embedded cells across 8 different frames
+        'lin1': [(f, f, 0, 0) for f in range(10)] + [(99, 999, 0, 0)],   # last cell has no distance-matrix entry
     })
+    label_to_index = {(f, f): i for i, f in enumerate(range(10))}
+    dist_matrix = _block_distance_matrix(10, {'lin1': (list(range(10)), 1.0)})
 
-    top_lin_ids, summary = pick_top_clones(full_df, embedded_df, n_clones=2, min_embedded_cells=5)
+    top_lin_ids, summary = pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=1, min_embedded_cells=5)
 
-    assert top_lin_ids == ['B', 'A'], f"expected B (more frame-spread) to win the tie over A, got {top_lin_ids}"
+    assert top_lin_ids == ['lin1']
+    assert summary.loc['lin1', 'n_cells'] == 10, "the unmatched cell must not be counted"
 
-    print("PASS: pick_top_clones breaks a true-count tie by preferring more distinct embedded frames")
+    print("PASS: pick_tightest_clones ignores embedded cells with no matching distance-matrix entry")
 
 
-def test_pick_top_clones_returns_fewer_than_n_clones_if_not_enough_eligible():
-    full_df = _full_df({'A': 50})
-    embedded_df = _embedded_df({'A': [(f, 0, 0) for f in range(10)]})
+def test_pick_tightest_clones_returns_fewer_than_n_clones_if_not_enough_eligible():
+    embedded_df = _embedded_df({'lin1': [(f, f, 0, 0) for f in range(10)]})
+    label_to_index = {(f, f): i for i, f in enumerate(range(10))}
+    dist_matrix = _block_distance_matrix(10, {'lin1': (list(range(10)), 1.0)})
 
-    top_lin_ids, summary = pick_top_clones(full_df, embedded_df, n_clones=3, min_embedded_cells=5)
+    top_lin_ids, summary = pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=5)
 
-    assert top_lin_ids == ['A'], f"expected just the 1 eligible clone, got {top_lin_ids}"
+    assert top_lin_ids == ['lin1'], f"expected just the 1 eligible clone, got {top_lin_ids}"
     assert len(summary) == 1
 
-    print("PASS: pick_top_clones returns fewer than n_clones when fewer are eligible, rather than erroring")
+    print("PASS: pick_tightest_clones returns fewer than n_clones when fewer are eligible, rather than erroring")
 
 
 def test_plot_clones_on_embedding_runs_without_error():
@@ -105,15 +140,15 @@ def test_plot_clones_on_embedding_runs_without_error():
     background_df = pd.DataFrame({'dim_0': rng.normal(0, 1, 100), 'dim_1': rng.normal(0, 1, 100)})
     clone_dfs = [
         pd.DataFrame({'dim_0': rng.normal(i, 0.3, 5), 'dim_1': rng.normal(i, 0.3, 5)})
-        for i in range(3)
+        for i in range(2)
     ]
 
-    fig = plot_clones_on_embedding(background_df, clone_dfs, ['lin1', 'lin2', 'lin3'], CLONE_COLORS, 'UMAP', 'test title')
+    fig = plot_clones_on_embedding(background_df, clone_dfs, ['lin1', 'lin2'], CLONE_COLORS[:2], 'UMAP', 'test title')
     assert fig is not None
-    assert len(fig.axes) == 3
+    assert len(fig.axes) == 2
     plt.close(fig)
 
-    print("PASS: plot_clones_on_embedding runs without error for 3 clones")
+    print("PASS: plot_clones_on_embedding runs without error for 2 clones")
 
 
 def test_plot_clones_on_embedding_handles_a_single_clone():
@@ -135,57 +170,78 @@ def test_plot_clones_on_embedding_handles_a_single_clone():
     print("PASS: plot_clones_on_embedding handles a single clone without crashing")
 
 
-def _synthetic_condition_data(seed=0):
+def _synthetic_embedded_df_and_distances(seed=0):
     rng = np.random.default_rng(seed)
 
-    full_rows = []
-    embedded_rows = []
-    for subclass, lin_id_counts in [
-        ('dying',       {'d1': 30, 'd2': 20, 'd3': 10}),
-        ('fast_prolif', {'f1': 200, 'f2': 150}),   # only 2 eligible clones here, fewer than n_clones=3
-    ]:
-        for lin_id, true_n in lin_id_counts.items():
-            full_rows.extend({'lin_id': lin_id, 'subclass': subclass} for _ in range(true_n))
-            n_embedded = min(true_n, 15)
-            for i in range(n_embedded):
-                embedded_rows.append({
-                    'lin_id': lin_id, 'subclass': subclass, 'frame': i % 5,
+    # per-subclass clones, with deliberately different tightness so the
+    # "pick the tightest 2" behavior is exercised for real - including a
+    # subclass ('slow_prolif') with only 1 eligible clone
+    CLONE_SPECS = {
+        'persisting':  {'p_tight': (0.1, 15), 'p_loose': (8.0, 15), 'p_mid': (3.0, 15)},
+        'slow_prolif': {'s_only': (1.0, 12)},
+        'fast_prolif': {'f_tight': (0.2, 20), 'f_loose': (7.0, 20)},
+    }
+
+    rows = []
+    label_to_index = {}
+    blocks = {}
+    idx = 0
+    pixel_counter = 1
+    for subclass, clones in CLONE_SPECS.items():
+        for lin_id, (within_distance, n) in clones.items():
+            indices = []
+            for i in range(n):
+                frame = i % 5
+                pixel_id = pixel_counter
+                pixel_counter += 1
+                rows.append({
+                    'lin_id': lin_id, 'subclass': subclass, 'frame': frame, 'pixel_id': pixel_id,
                     'dim_0': rng.normal(0, 1), 'dim_1': rng.normal(0, 1),
                 })
+                label_to_index[(frame, pixel_id)] = idx
+                indices.append(idx)
+                idx += 1
+            blocks[lin_id] = (indices, within_distance)
 
-    return pd.DataFrame(full_rows), pd.DataFrame(embedded_rows)
+    embedded_df = pd.DataFrame(rows)
+    dist_matrix = _block_distance_matrix(idx, blocks)
+    return embedded_df, dist_matrix, label_to_index
 
 
 def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass():
-    full_df, embedded_df = _synthetic_condition_data()
+    embedded_df, dist_matrix, label_to_index = _synthetic_embedded_df_and_distances()
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         combined = export_clones_by_subclass(
-            embedded_df, full_df, tmp_dir, 'cell_umap', 'UMAP', 'cell morphology',
-            n_clones=3, min_embedded_cells=5,
+            embedded_df, dist_matrix, label_to_index, tmp_dir, 'cell_umap', 'UMAP', 'cell morphology',
+            n_clones=2, min_embedded_cells=10, subclasses=['persisting', 'slow_prolif', 'fast_prolif'],
         )
 
-        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_dying.pdf'))
-        assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_dying.svg'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting.pdf'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_persisting.svg'))
         assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_fast_prolif.pdf'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_fast_prolif.svg'))
 
         summary_csv_path = os.path.join(tmp_dir, 'cell_umap_clone_summary.csv')
         assert os.path.isfile(summary_csv_path)
         on_disk = pd.read_csv(summary_csv_path)
-        assert set(on_disk.columns) == {'subclass', 'lin_id', 'true_n_cells', 'embedded_n_cells', 'embedded_n_frames'}
+        assert set(on_disk.columns) == {'subclass', 'lin_id', 'n_cells', 'mean_pairwise_distance'}
 
-        dying_rows = on_disk[on_disk['subclass'] == 'dying']
-        assert len(dying_rows) == 3, f"expected all 3 dying clones to be eligible, got {len(dying_rows)}"
-        assert set(dying_rows['lin_id']) == {'d1', 'd2', 'd3'}
+        persisting_rows = on_disk[on_disk['subclass'] == 'persisting']
+        assert list(persisting_rows['lin_id']) == ['p_tight', 'p_mid'], \
+            f"expected the 2 tightest persisting clones in tightness order, got {list(persisting_rows['lin_id'])}"
+
+        slow_prolif_rows = on_disk[on_disk['subclass'] == 'slow_prolif']
+        assert len(slow_prolif_rows) == 1, f"expected only 1 eligible slow_prolif clone, got {len(slow_prolif_rows)}"
+        assert slow_prolif_rows.iloc[0]['lin_id'] == 's_only'
 
         fast_prolif_rows = on_disk[on_disk['subclass'] == 'fast_prolif']
-        assert len(fast_prolif_rows) == 2, f"expected only 2 eligible fast_prolif clones (fewer than n_clones=3), got {len(fast_prolif_rows)}"
+        assert list(fast_prolif_rows['lin_id']) == ['f_tight', 'f_loose']
 
-        assert combined.equals(on_disk) or len(combined) == len(on_disk)
+        assert len(combined) == len(on_disk)
 
-    print("PASS: export_clones_by_subclass writes a PDF+SVG per subclass and a combined summary CSV, "
-          "handling a subclass with fewer than n_clones eligible clones")
+    print("PASS: export_clones_by_subclass picks the tightest clones per subclass, writes a PDF+SVG per subclass, "
+          "and a combined summary CSV - handling a subclass with fewer than n_clones eligible clones")
 
 
 def test_clone_colors_do_not_reuse_any_tab_color_or_region_color():
@@ -205,10 +261,10 @@ def test_clone_colors_do_not_reuse_any_tab_color_or_region_color():
 
 
 if __name__ == '__main__':
-    test_pick_top_clones_ranks_by_true_count_not_embedded_count()
-    test_pick_top_clones_filters_by_min_embedded_cells()
-    test_pick_top_clones_breaks_ties_by_frame_span()
-    test_pick_top_clones_returns_fewer_than_n_clones_if_not_enough_eligible()
+    test_pick_tightest_clones_prefers_lower_mean_pairwise_distance()
+    test_pick_tightest_clones_filters_by_min_embedded_cells()
+    test_pick_tightest_clones_skips_labels_missing_from_the_distance_matrix()
+    test_pick_tightest_clones_returns_fewer_than_n_clones_if_not_enough_eligible()
     test_plot_clones_on_embedding_runs_without_error()
     test_plot_clones_on_embedding_handles_a_single_clone()
     test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()

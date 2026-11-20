@@ -1,6 +1,7 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from IPython.display import display
 
@@ -15,57 +16,63 @@ CLONE_COLORS = ['#46f0f0', '#9a6324', '#000000']
 SUBCLASSES = ['dying', 'persisting', 'slow_prolif', 'fast_prolif']
 
 
-def pick_top_clones(full_df, embedded_df, n_clones=3, min_embedded_cells=5,
-                     lin_id_col='lin_id', frame_col='frame'):
+def pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=10,
+                          lin_id_col='lin_id', frame_col='frame', pixel_id_col='pixel_id'):
     '''
-    Pick the n_clones lin_ids ("clones") with the most TRUE segmented
-    cells, among those with enough cells actually in the CAJAL-embedded
-    sample to be worth plotting.
-
-    full_df is the true population a lin_id's size is measured against -
-    e.g. every has_mask vem_1uM cell of one subclass, straight from
-    {condition}_metadata.csv, NOT just the randomly budgeted subset that
-    went through CAJAL (an analysis's embedding only ever covers a
-    sampled fraction of all segmented cells). embedded_df is that
-    CAJAL-embedded subset (has dim_0/dim_1), same condition and subclass
-    restriction - only lin_ids with at least min_embedded_cells cells
-    there are eligible at all, since a clone with the most true cells but
-    zero embedded ones can't be painted onto the embedding.
-
-    Ties in true cell count are broken by how many distinct frames that
-    lin_id's EMBEDDED cells span (more spread over time wins) - a
-    secondary criterion only; "most cells" is still the primary one.
+    Pick the n_clones lin_ids ("clones") whose own embedded cells are
+    most tightly clustered morphologically - lowest mean pairwise CAJAL
+    GW distance among themselves, using the REAL distance matrix, not
+    the UMAP/PHATE 2D projection (which distorts distances - the same
+    rule this repo already follows everywhere else a quantitative claim
+    is made, e.g. shared/pair_similarity.py) - among lin_ids with enough
+    cells in the embedded sample to make that mean meaningful.
 
     Inputs:
-        full_df:            true per-lin_id population, already
-                            restricted by the caller to one condition,
-                            has_mask=True, and one subclass
-        embedded_df:        the CAJAL-embedded subset, same condition and
-                            subclass restriction (has dim_0, dim_1)
+        embedded_df:        the CAJAL-embedded subset (has lin_id,
+                            frame, pixel_id), already restricted by the
+                            caller to one subclass
+        dist_matrix:        (n, n) real CAJAL GW distance matrix, e.g.
+                            from shared.cajal.embed.load_distance_matrix
+        label_to_index:     {(frame, pixel_id): row/col index into
+                            dist_matrix} - e.g. built from
+                            load_distance_matrix's own labels via
+                            shared.load_data.parse_label
         n_clones:           how many lin_ids to pick (fewer are returned
                             if fewer than n_clones are eligible)
         min_embedded_cells: floor on embedded-cell count for eligibility
-        lin_id_col, frame_col: column names
+                            (must be >= 2 - a mean pairwise distance
+                            needs at least 2 cells to exist at all)
+        lin_id_col, frame_col, pixel_id_col: column names
     Outputs:
-        top_lin_ids: list of lin_ids, ranked (true count desc, then
-                     embedded frame-span desc) - length <= n_clones
+        top_lin_ids: list of lin_ids, ranked tightest (lowest mean
+                     pairwise distance) first - length <= n_clones
         summary:     DataFrame indexed by lin_id, same rows/order as
-                     top_lin_ids, columns [true_n_cells,
-                     embedded_n_cells, embedded_n_frames] - for CSV
-                     export/transparency
+                     top_lin_ids, columns [n_cells,
+                     mean_pairwise_distance] - for CSV export/transparency
     '''
-    true_counts     = full_df.groupby(lin_id_col).size().rename('true_n_cells')
-    embedded_counts = embedded_df.groupby(lin_id_col).size().rename('embedded_n_cells')
-    embedded_frames = embedded_df.groupby(lin_id_col)[frame_col].nunique().rename('embedded_n_frames')
+    min_embedded_cells = max(2, min_embedded_cells)
 
-    summary = pd.concat([true_counts, embedded_counts, embedded_frames], axis=1)
-    for col in ['true_n_cells', 'embedded_n_cells', 'embedded_n_frames']:
-        summary[col] = summary[col].fillna(0).astype(int)
+    rows = []
+    for lin_id, group in embedded_df.groupby(lin_id_col):
+        indices = [
+            label_to_index[(frame, pixel_id)]
+            for frame, pixel_id in zip(group[frame_col], group[pixel_id_col])
+            if (frame, pixel_id) in label_to_index
+        ]
+        if len(indices) < min_embedded_cells:
+            continue
 
-    eligible = summary[summary['embedded_n_cells'] >= min_embedded_cells]
-    eligible = eligible.sort_values(['true_n_cells', 'embedded_n_frames'], ascending=False)
+        indices = np.array(indices)
+        sub = dist_matrix[np.ix_(indices, indices)]
+        iu = np.triu_indices(len(indices), k=1)
+        rows.append({'lin_id': lin_id, 'n_cells': len(indices), 'mean_pairwise_distance': sub[iu].mean()})
 
-    top = eligible.head(n_clones)
+    summary = pd.DataFrame(rows).set_index('lin_id') if rows else pd.DataFrame(
+        columns=['n_cells', 'mean_pairwise_distance']
+    )
+    summary = summary.sort_values('mean_pairwise_distance', ascending=True)
+
+    top = summary.head(n_clones)
     return top.index.tolist(), top
 
 
@@ -75,6 +82,10 @@ def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embeddin
     al., "Diverse clonal fates emerge upon drug treatment of homogeneous
     cancer cells"): background_df's full population in light grey behind
     every panel, with that panel's own clone highlighted in its own color.
+
+    This is purely a VISUALIZATION on the 2D UMAP/PHATE embedding - which
+    clones get highlighted is decided upstream (see pick_tightest_clones)
+    on the real CAJAL distance matrix, never on dim_0/dim_1 here.
 
     Inputs:
         background_df:   the full embedding population to show as grey
@@ -107,41 +118,37 @@ def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embeddin
     return fig
 
 
-def export_clones_by_subclass(embedded_df, full_metadata_df, output_dir, file_prefix, embedding_label, title_prefix,
-                               n_clones=3, min_embedded_cells=5, colors=CLONE_COLORS, subclasses=SUBCLASSES):
+def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_dir, file_prefix, embedding_label,
+                               title_prefix, n_clones=2, min_embedded_cells=10, colors=CLONE_COLORS,
+                               subclasses=SUBCLASSES):
     '''
-    For each subclass, pick the top n_clones lin_ids (see pick_top_clones)
-    and paint them onto embedded_df's embedding (see
-    plot_clones_on_embedding) - one PDF/SVG figure per subclass:
+    For each subclass, pick the n_clones tightest-clustered lin_ids (see
+    pick_tightest_clones) and paint them onto embedded_df's embedding
+    (see plot_clones_on_embedding) - one PDF/SVG figure per subclass:
 
     output_dir/{file_prefix}_{subclass}.pdf, output_dir/svgs/{file_prefix}_{subclass}.svg
 
     Also writes one combined output_dir/{file_prefix}_clone_summary.csv
-    (every chosen clone, every subclass, with its true_n_cells/
-    embedded_n_cells/embedded_n_frames) so the exact selection stays
-    reproducible/inspectable without re-running this function, and
-    displays every figure directly in the notebook's output.
+    (every chosen clone, every subclass, with its n_cells/
+    mean_pairwise_distance) so the exact selection stays reproducible/
+    inspectable without re-running this function, and displays every
+    figure directly in the notebook's output.
 
     Inputs:
-        embedded_df:       the CAJAL-embedded subset for one condition
-                           (has dim_0, dim_1, subclass, lin_id, frame) -
-                           e.g. vem_df from load_full_dataset, already
-                           restricted to the vem condition. Also used as
-                           EVERY panel's own grey background, so clones
-                           are shown in context of the whole condition's
-                           embedding, not just their own subclass.
-        full_metadata_df:  the SAME condition's full has_mask metadata,
-                           with a 'subclass' column already added (e.g.
-                           via shared.classify.classify_subclass) - the
-                           true population each lin_id's count is
-                           measured against, not just the CAJAL-sampled
-                           subset
+        embedded_df:     the CAJAL-embedded subset for one condition
+                         (has dim_0, dim_1, subclass, lin_id, frame,
+                         pixel_id) - e.g. from load_full_dataset. Also
+                         used as EVERY panel's own grey background, so
+                         clones are shown in context of the whole
+                         condition's embedding, not just their own subclass.
+        dist_matrix, label_to_index: see pick_tightest_clones - the SAME
+                         condition/modality this embedded_df came from
         output_dir, file_prefix: as elsewhere in this repo (see shared.density_plots, shared.representative_shapes)
-        embedding_label:   'UMAP' or 'PHATE'
-        title_prefix:      e.g. 'cell morphology' - the subclass name is appended automatically
-        n_clones, min_embedded_cells: see pick_top_clones
-        colors:            [color, ...], at least n_clones long
-        subclasses:        which subclass values to produce a figure for
+        embedding_label: 'UMAP' or 'PHATE'
+        title_prefix:    e.g. 'cell morphology' - the subclass name is appended automatically
+        n_clones, min_embedded_cells: see pick_tightest_clones
+        colors:          [color, ...], at least n_clones long
+        subclasses:      which subclass values to produce a figure for
     Outputs:
         summary: combined clone_summary DataFrame across every subclass
                  that had an eligible clone, for notebook inspection
@@ -152,15 +159,14 @@ def export_clones_by_subclass(embedded_df, full_metadata_df, output_dir, file_pr
     summary_parts = []
     for subclass in subclasses:
         embedded_subset = embedded_df[embedded_df['subclass'] == subclass]
-        full_subset     = full_metadata_df[full_metadata_df['subclass'] == subclass]
 
-        lin_ids, summary = pick_top_clones(full_subset, embedded_subset, n_clones, min_embedded_cells)
+        lin_ids, summary = pick_tightest_clones(embedded_subset, dist_matrix, label_to_index, n_clones, min_embedded_cells)
         if not lin_ids:
-            print(f"  No clone in subclass '{subclass}' has >= {min_embedded_cells} embedded cells - skipping")
+            print(f"  No clone in subclass '{subclass}' has >= {max(2, min_embedded_cells)} embedded cells - skipping")
             continue
         if len(lin_ids) < n_clones:
             print(f"  Only {len(lin_ids)}/{n_clones} eligible clone(s) in subclass '{subclass}' "
-                  f"(>= {min_embedded_cells} embedded cells)")
+                  f"(>= {max(2, min_embedded_cells)} embedded cells)")
 
         clone_dfs = [embedded_subset[embedded_subset['lin_id'] == lin_id] for lin_id in lin_ids]
         fig = plot_clones_on_embedding(
