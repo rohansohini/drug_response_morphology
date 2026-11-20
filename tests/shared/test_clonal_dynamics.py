@@ -151,6 +151,36 @@ def test_plot_clones_on_embedding_runs_without_error():
     print("PASS: plot_clones_on_embedding runs without error for 2 clones")
 
 
+def test_plot_clones_on_embedding_always_renders_n_panels_the_same_size():
+    # regression test: a subclass with fewer eligible clones than
+    # n_clones must still export the SAME size image as one with every
+    # slot filled - any leftover panel gets a placeholder instead of
+    # shrinking the whole figure
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    rng = np.random.default_rng(0)
+    background_df = pd.DataFrame({'dim_0': rng.normal(0, 1, 100), 'dim_1': rng.normal(0, 1, 100)})
+    one_clone_df = [pd.DataFrame({'dim_0': rng.normal(0, 0.3, 5), 'dim_1': rng.normal(0, 0.3, 5)})]
+    two_clone_dfs = one_clone_df + [pd.DataFrame({'dim_0': rng.normal(3, 0.3, 5), 'dim_1': rng.normal(3, 0.3, 5)})]
+
+    fig_partial = plot_clones_on_embedding(background_df, one_clone_df, ['lin1'], [CLONE_COLORS[0]], 'UMAP', 'title', n_panels=2)
+    fig_full = plot_clones_on_embedding(background_df, two_clone_dfs, ['lin1', 'lin2'], CLONE_COLORS[:2], 'UMAP', 'title', n_panels=2)
+
+    assert len(fig_partial.axes) == 2, f"expected 2 panels even with only 1 eligible clone, got {len(fig_partial.axes)}"
+    assert fig_partial.get_size_inches().tolist() == fig_full.get_size_inches().tolist(), (
+        "a figure with fewer eligible clones must be the exact same size as one with every slot filled"
+    )
+    assert fig_partial.axes[1].get_legend() is None, "the placeholder panel must not get a legend"
+    assert any('no eligible clone' in t.get_text() for t in fig_partial.axes[1].texts)
+
+    plt.close(fig_partial)
+    plt.close(fig_full)
+
+    print("PASS: plot_clones_on_embedding always renders n_panels, same size whether or not every slot has a clone")
+
+
 def test_plot_clones_on_embedding_handles_a_single_clone():
     # plt.subplots(1, 1, ...) returns a bare Axes, not an array - must not
     # crash when iterating over it (same edge case as
@@ -175,11 +205,13 @@ def _synthetic_embedded_df_and_distances(seed=0):
 
     # per-subclass clones, with deliberately different tightness so the
     # "pick the tightest 2" behavior is exercised for real - including a
-    # subclass ('slow_prolif') with only 1 eligible clone
+    # subclass ('slow_prolif') with only 1 eligible clone, and one
+    # ('dying') with ZERO eligible clones at all
     CLONE_SPECS = {
         'persisting':  {'p_tight': (0.1, 15), 'p_loose': (8.0, 15), 'p_mid': (3.0, 15)},
         'slow_prolif': {'s_only': (1.0, 12)},
         'fast_prolif': {'f_tight': (0.2, 20), 'f_loose': (7.0, 20)},
+        'dying':       {'d_too_small': (0.5, 3)},
     }
 
     rows = []
@@ -214,13 +246,21 @@ def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
     with tempfile.TemporaryDirectory() as tmp_dir:
         combined = export_clones_by_subclass(
             embedded_df, dist_matrix, label_to_index, tmp_dir, 'cell_umap', 'UMAP', 'cell morphology',
-            n_clones=2, min_embedded_cells=10, subclasses=['persisting', 'slow_prolif', 'fast_prolif'],
+            n_clones=2, min_embedded_cells=10, subclasses=['persisting', 'slow_prolif', 'fast_prolif', 'dying'],
         )
 
         assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting.pdf'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_persisting.svg'))
         assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_fast_prolif.pdf'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_fast_prolif.svg'))
+
+        # 'dying' has ZERO eligible clones (its only candidate is below
+        # min_embedded_cells) - it must still get a PDF/SVG (all-placeholder
+        # panels), not be silently skipped, so every requested subclass's
+        # image stays present and the same size as its siblings
+        dying_pdf_path = os.path.join(tmp_dir, 'cell_umap_dying.pdf')
+        assert os.path.isfile(dying_pdf_path), "a subclass with zero eligible clones must still get a placeholder PDF"
+        assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_dying.svg'))
 
         summary_csv_path = os.path.join(tmp_dir, 'cell_umap_clone_summary.csv')
         assert os.path.isfile(summary_csv_path)
@@ -237,6 +277,9 @@ def test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
 
         fast_prolif_rows = on_disk[on_disk['subclass'] == 'fast_prolif']
         assert list(fast_prolif_rows['lin_id']) == ['f_tight', 'f_loose']
+
+        dying_rows = on_disk[on_disk['subclass'] == 'dying']
+        assert dying_rows.empty, "dying has zero eligible clones - it should contribute no summary rows, even though it still got a placeholder figure"
 
         assert len(combined) == len(on_disk)
 
@@ -267,6 +310,7 @@ if __name__ == '__main__':
     test_pick_tightest_clones_returns_fewer_than_n_clones_if_not_enough_eligible()
     test_plot_clones_on_embedding_runs_without_error()
     test_plot_clones_on_embedding_handles_a_single_clone()
+    test_plot_clones_on_embedding_always_renders_n_panels_the_same_size()
     test_export_clones_by_subclass_writes_pdf_svg_and_summary_csv_per_subclass()
     test_clone_colors_do_not_reuse_any_tab_color_or_region_color()
     print("\nAll tests passed.")

@@ -150,7 +150,7 @@ def test_plot_representative_shapes_runs_without_error():
         'crop': [np.zeros((10, 10), dtype=np.uint16), np.ones((10, 10), dtype=np.uint16)],
     })
 
-    fig = plot_representative_shapes(shapes, 'cell morphology (representative regions)')
+    fig = plot_representative_shapes(shapes, 'cell morphology (representative regions)', n_regions=2)
     assert fig is not None
     plt.close(fig)
 
@@ -169,11 +169,49 @@ def test_plot_representative_shapes_handles_a_single_region():
         'crop': [np.ones((10, 10), dtype=np.uint16)],
     })
 
-    fig = plot_representative_shapes(shapes, 'cell morphology')
+    fig = plot_representative_shapes(shapes, 'cell morphology', n_regions=1)
     assert fig is not None
     plt.close(fig)
 
     print("PASS: plot_representative_shapes handles a single region without crashing")
+
+
+def test_plot_representative_shapes_always_renders_n_regions_panels():
+    # regression test: figure size must come from the REQUESTED n_regions,
+    # not from however many regions `shapes` actually has - otherwise a
+    # region missing its own representative shape (for any reason) would
+    # silently shrink the whole image, making it a different size from
+    # a sibling plot (e.g. the same analysis's other modality/embedding
+    # method) that didn't lose a region.
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    shapes = pd.DataFrame({
+        'region': [0, 2, 4],   # regions 1 and 3 have no representative shape at all
+        'crop': [np.ones((10, 10), dtype=np.uint16)] * 3,
+    })
+
+    full_shapes = pd.DataFrame({
+        'region': [0, 1, 2, 3, 4],
+        'crop': [np.ones((10, 10), dtype=np.uint16)] * 5,
+    })
+
+    fig_missing = plot_representative_shapes(shapes, 'cell morphology', n_regions=5)
+    fig_full = plot_representative_shapes(full_shapes, 'cell morphology', n_regions=5)
+
+    assert len(fig_missing.axes) == 5, f"expected 5 panels even with 2 regions missing, got {len(fig_missing.axes)}"
+    assert fig_missing.get_size_inches().tolist() == fig_full.get_size_inches().tolist(), (
+        "a figure with missing regions must be the exact same size as one with every region present"
+    )
+
+    missing_titles = [ax.get_title() for ax in fig_missing.axes]
+    assert missing_titles == ['region 0', 'region 1', 'region 2', 'region 3', 'region 4']
+
+    plt.close(fig_missing)
+    plt.close(fig_full)
+
+    print("PASS: plot_representative_shapes always renders n_regions panels, same size whether or not every region has a shape")
 
 
 def test_region_colors_do_not_reuse_any_tab_color():
@@ -200,5 +238,6 @@ if __name__ == '__main__':
     test_plot_embedding_by_region_runs_without_error()
     test_plot_representative_shapes_runs_without_error()
     test_plot_representative_shapes_handles_a_single_region()
+    test_plot_representative_shapes_always_renders_n_regions_panels()
     test_region_colors_do_not_reuse_any_tab_color()
     print("\nAll tests passed.")

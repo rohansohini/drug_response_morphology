@@ -69,19 +69,28 @@ def pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, m
 
     summary = pd.DataFrame(rows).set_index('lin_id') if rows else pd.DataFrame(
         columns=['n_cells', 'mean_pairwise_distance']
-    )
+    ).rename_axis('lin_id')
     summary = summary.sort_values('mean_pairwise_distance', ascending=True)
 
     top = summary.head(n_clones)
     return top.index.tolist(), top
 
 
-def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embedding_label, title):
+def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embedding_label, title, n_panels=None):
     '''
     One stacked panel per clone (same layout as Figure 1g of Shaffer et
     al., "Diverse clonal fates emerge upon drug treatment of homogeneous
     cancer cells"): background_df's full population in light grey behind
     every panel, with that panel's own clone highlighted in its own color.
+
+    ALWAYS renders exactly n_panels panels, even when fewer clones were
+    actually found eligible (len(clone_dfs) < n_panels) - any leftover
+    panel gets an empty "no eligible clone" placeholder (still with the
+    same grey background, so it's visibly consistent with its siblings)
+    rather than shrinking the whole figure. Without this, a subclass
+    with only 1 eligible clone would export a shorter image than one
+    with the full n_panels, making the two not directly comparable/
+    stackable side by side.
 
     This is purely a VISUALIZATION on the 2D UMAP/PHATE embedding - which
     clones get highlighted is decided upstream (see pick_tightest_clones)
@@ -92,26 +101,37 @@ def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embeddin
                          context in every panel (dim_0, dim_1)
         clone_dfs:       [df, ...] - one DataFrame per clone, each
                          already restricted to that one lin_id's own
-                         embedded cells (dim_0, dim_1)
+                         embedded cells (dim_0, dim_1) - may be shorter
+                         than n_panels
         lin_ids:         [lin_id, ...] - same order/length as clone_dfs, for labeling
         colors:          [color, ...] - same order/length as clone_dfs
         embedding_label: axis label text only, e.g. 'UMAP' or 'PHATE'
         title:           figure suptitle
+        n_panels:        how many panels to render - the caller's own
+                         configured n_clones (the max this figure could
+                         ever need); defaults to len(clone_dfs) for a
+                         caller that doesn't care about cross-figure
+                         size consistency
     Outputs:
         fig: caller saves/closes this
     '''
-    n = len(clone_dfs)
-    fig, axes = plt.subplots(n, 1, figsize=(5.5, 4.4 * n), sharex=True, sharey=True)
-    if n == 1:
+    n_panels = n_panels if n_panels is not None else len(clone_dfs)
+    fig, axes = plt.subplots(n_panels, 1, figsize=(5.5, 4.4 * n_panels), sharex=True, sharey=True)
+    if n_panels == 1:
         axes = [axes]
 
-    for ax, clone_df, lin_id, color in zip(axes, clone_dfs, lin_ids, colors):
+    for i, ax in enumerate(axes):
         ax.scatter(background_df['dim_0'], background_df['dim_1'], s=3, color='lightgrey', alpha=0.3, zorder=1)
-        ax.scatter(clone_df['dim_0'], clone_df['dim_1'], s=14, color=color, zorder=2,
-                   label=f'lin_id {lin_id} (n={len(clone_df)})')
+        if i < len(clone_dfs):
+            clone_df, lin_id, color = clone_dfs[i], lin_ids[i], colors[i]
+            ax.scatter(clone_df['dim_0'], clone_df['dim_1'], s=14, color=color, zorder=2,
+                       label=f'lin_id {lin_id} (n={len(clone_df)})')
+            ax.legend(loc='best', fontsize=8)
+        else:
+            ax.text(0.5, 0.5, 'no eligible clone', ha='center', va='center',
+                     fontsize=10, color='grey', transform=ax.transAxes)
         ax.set_xlabel(f'{embedding_label} 1')
         ax.set_ylabel(f'{embedding_label} 2')
-        ax.legend(loc='best', fontsize=8)
 
     fig.suptitle(title)
     fig.tight_layout()
@@ -151,7 +171,9 @@ def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_d
         subclasses:      which subclass values to produce a figure for
     Outputs:
         summary: combined clone_summary DataFrame across every subclass
-                 that had an eligible clone, for notebook inspection
+                 in `subclasses` (a subclass with zero eligible clones
+                 simply contributes no rows, not a missing figure), for
+                 notebook inspection
     '''
     svg_dir = os.path.join(output_dir, 'svgs')
     os.makedirs(svg_dir, exist_ok=True)
@@ -162,16 +184,22 @@ def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_d
 
         lin_ids, summary = pick_tightest_clones(embedded_subset, dist_matrix, label_to_index, n_clones, min_embedded_cells)
         if not lin_ids:
-            print(f"  No clone in subclass '{subclass}' has >= {max(2, min_embedded_cells)} embedded cells - skipping")
-            continue
-        if len(lin_ids) < n_clones:
+            print(f"  No clone in subclass '{subclass}' has >= {max(2, min_embedded_cells)} embedded cells - "
+                  f"exporting an empty placeholder figure so every subclass's image stays the same size")
+        elif len(lin_ids) < n_clones:
             print(f"  Only {len(lin_ids)}/{n_clones} eligible clone(s) in subclass '{subclass}' "
                   f"(>= {max(2, min_embedded_cells)} embedded cells)")
 
+        # every subclass gets a figure with exactly n_clones panels (see
+        # plot_clones_on_embedding's own docstring), whether or not
+        # n_clones clones turned out eligible - otherwise a subclass
+        # with fewer (or zero) eligible clones would export a shorter
+        # image, or no image at all, breaking size consistency across
+        # this notebook's own set of per-subclass figures
         clone_dfs = [embedded_subset[embedded_subset['lin_id'] == lin_id] for lin_id in lin_ids]
         fig = plot_clones_on_embedding(
             embedded_df, clone_dfs, lin_ids, colors[:len(lin_ids)], embedding_label,
-            f'{title_prefix} - {subclass} clones',
+            f'{title_prefix} - {subclass} clones', n_panels=n_clones,
         )
         fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}.pdf'), bbox_inches='tight')
         fig.savefig(os.path.join(svg_dir, f'{file_prefix}_{subclass}.svg'), bbox_inches='tight')

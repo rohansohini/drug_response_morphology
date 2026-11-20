@@ -172,31 +172,54 @@ def plot_embedding_by_region(df, embedding_label, title):
     return fig
 
 
-def plot_representative_shapes(shapes, title):
+def plot_representative_shapes(shapes, title, n_regions):
     '''
     One row of each region's actual representative cell shape, bordered
     in that region's own color (the same colors plot_embedding_by_region
     marks its centroid with).
 
+    ALWAYS renders exactly n_regions panels, the caller's own requested
+    region count - NOT len(shapes) (how many regions actually got a
+    representative shape). These are almost always equal (k-means
+    relocates empty clusters during fitting, so an empty final region is
+    not expected in practice), but deriving the image size from the
+    REQUESTED count rather than the data keeps every export at the same,
+    predictable size regardless: a region missing its own shape for any
+    reason gets an empty "no cells in this region" placeholder panel
+    instead of silently shrinking the whole figure.
+
     Inputs:
-        shapes: from pick_representative_shapes
-        title:  figure title
+        shapes:    from pick_representative_shapes - may have fewer than
+                  n_regions rows
+        title:     figure title
+        n_regions: the number of panels to render (the region count this
+                  plot was actually clustered into - see
+                  assign_kmeans_regions/pick_representative_shapes)
     Outputs:
         fig: caller saves/closes this
     '''
-    n_regions = len(shapes)
     fig, axes = plt.subplots(1, n_regions, figsize=(2.2 * n_regions, 2.6))
     if n_regions == 1:
         axes = [axes]
 
-    for ax, (_, shape_row) in zip(axes, shapes.iterrows()):
-        color = REGION_COLORS[shape_row['region'] % len(REGION_COLORS)]
-        ax.imshow(shape_row['crop'] > 0, cmap='gray_r')
-        ax.set_title(f"region {shape_row['region']}", color=color)
+    shape_by_region = {row['region']: row for _, row in shapes.iterrows()}
+
+    for region, ax in enumerate(axes):
+        shape_row = shape_by_region.get(region)
+        color = REGION_COLORS[region % len(REGION_COLORS)]
+
+        if shape_row is not None:
+            ax.imshow(shape_row['crop'] > 0, cmap='gray_r')
+            ax.set_title(f"region {region}", color=color)
+        else:
+            ax.text(0.5, 0.5, 'no cells\nin this region', ha='center', va='center',
+                     fontsize=8, color='grey', transform=ax.transAxes)
+            ax.set_title(f"region {region}", color='grey')
+
         ax.set_xticks([])
         ax.set_yticks([])
         for spine in ax.spines.values():
-            spine.set_edgecolor(color)
+            spine.set_edgecolor(color if shape_row is not None else 'lightgrey')
             spine.set_linewidth(3)
 
     fig.suptitle(title)
@@ -216,6 +239,15 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     Also displays both figures directly in the notebook's output, so you
     don't have to open the saved files just to see them.
 
+    half_width is a crop size in pixels around each representative
+    cell's own centroid - keep it the SAME across every region within
+    one call (every region here always gets the one half_width passed
+    in), but pick a SEPARATE, smaller value for 'nuc' than for 'cell'
+    when calling this per modality: a nucleus is much smaller than its
+    whole cell, so the same half_width that comfortably fits a cell
+    crop leaves a nucleus shape too small to make out, surrounded by
+    mostly empty padding.
+
     Outputs:
         df: from pick_representative_shapes, for notebook inspection
     '''
@@ -230,7 +262,7 @@ def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_l
     display(embedding_fig)
     plt.close(embedding_fig)
 
-    shapes_fig = plot_representative_shapes(shapes, title)
+    shapes_fig = plot_representative_shapes(shapes, title, n_regions)
     shapes_fig.savefig(os.path.join(output_dir, f'{file_prefix}_shapes.pdf'), bbox_inches='tight')
     shapes_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_shapes.svg'), bbox_inches='tight')
     display(shapes_fig)
