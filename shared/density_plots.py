@@ -1,9 +1,11 @@
+import io
 import os
 
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from IPython.display import display
+from PIL import Image
 import seaborn as sns
 
 
@@ -130,16 +132,18 @@ def plot_embedding_with_weighted_kde(df, weight_cols, group_colors, ax, title, e
     ax.legend(handles=legend_handles, fontsize=8)
 
 
-def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1):
+def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title_prefix=None, min_group_size=5, levels=(0.7, 0.8, 0.9), bw_adjust=1, fps=2):
     '''
-    One combined, multi-page PDF and one SVG per frame (in their own
-    svgs/ subfolder, since there are many of those but only one PDF) -
-    each page a plot_embedding_with_kde call restricted to that frame's
+    One combined, multi-page PDF, one SVG per frame (in their own
+    svgs/ subfolder, since there are many of those but only one PDF),
+    and one animated GIF stepping through every frame in order - each
+    page/frame a plot_embedding_with_kde call restricted to that frame's
     cells. Shared by every analysis notebook - they differ only in which
     df/group_col/colors/output_dir they pass in, and which embedding's
     coordinates df holds.
 
     output_dir/{file_prefix}.pdf
+    output_dir/{file_prefix}.gif
     output_dir/svgs/{file_prefix}_frame_NN.svg
 
     Also displays each frame's figure directly in the notebook's output
@@ -168,6 +172,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
         min_group_size:  passed through to plot_embedding_with_kde
         levels:          passed through to plot_embedding_with_kde
         bw_adjust:       passed through to plot_embedding_with_kde
+        fps:             frames per second for the GIF
     '''
     title_prefix = file_prefix if title_prefix is None else title_prefix
 
@@ -189,6 +194,7 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
     xlim  = (x_min - x_pad, x_max + x_pad)
     ylim  = (y_min - y_pad, y_max + y_pad)
 
+    gif_frames = []
     with PdfPages(pdf_path) as pdf:
         for frame in frames:
             subset = df[df['frame'] == frame]
@@ -200,10 +206,28 @@ def export_kde_by_frame(df, group_col, group_colors, output_dir, file_prefix, em
             )
             pdf.savefig(fig, bbox_inches='tight')
             fig.savefig(os.path.join(svg_dir, f'{file_prefix}_frame_{frame:02d}.svg'), bbox_inches='tight')
+
+            # deliberately NOT bbox_inches='tight' here - a 'tight' crop's
+            # pixel size can vary slightly frame to frame (e.g. legend
+            # text width changes with each group's own n=), which would
+            # give the GIF mismatched frame sizes. The fixed figsize/dpi
+            # above already guarantees every frame renders to the exact
+            # same pixel dimensions.
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', dpi=120)
+            buf.seek(0)
+            gif_frames.append(Image.open(buf).convert('RGB'))
+
             display(fig)   # show it in the notebook's own output, not just save it to disk
             plt.close(fig)
 
-    print(f"  Saved {len(frames)} frame(s) to {pdf_path} and {svg_dir}")
+    gif_path = os.path.join(output_dir, f'{file_prefix}.gif')
+    gif_frames[0].save(
+        gif_path, save_all=True, append_images=gif_frames[1:],
+        duration=1000 / fps, loop=0,
+    )
+
+    print(f"  Saved {len(frames)} frame(s) to {pdf_path}, {svg_dir}, and {gif_path} ({fps} fps)")
 
 
 def export_kde(df, group_col, group_colors, output_dir, file_prefix, embedding_label, title=None,

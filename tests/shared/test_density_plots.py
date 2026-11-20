@@ -79,10 +79,10 @@ def test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame(tmp_dir='/tmp/clau
     svg_dir = os.path.join(tmp_dir, 'svgs')
     expected_svgs = {f'cell_umap_frame_0{f}.svg' for f in [1, 2, 3]}
 
-    # PDF sits directly in tmp_dir (no pdfs/ subfolder) - only the SVGs,
+    # PDF and GIF sit directly in tmp_dir (no subfolder) - only the SVGs,
     # since there are many, get their own subfolder
-    assert set(os.listdir(tmp_dir)) == {'cell_umap.pdf', 'svgs'}, \
-        f"expected cell_umap.pdf and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
+    assert set(os.listdir(tmp_dir)) == {'cell_umap.pdf', 'cell_umap.gif', 'svgs'}, \
+        f"expected cell_umap.pdf, cell_umap.gif, and svgs/ directly in {tmp_dir}, got {os.listdir(tmp_dir)}"
     assert set(os.listdir(svg_dir)) == expected_svgs, f"got {os.listdir(svg_dir)}"
 
     pdf_path = os.path.join(tmp_dir, 'cell_umap.pdf')
@@ -94,7 +94,43 @@ def test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame(tmp_dir='/tmp/clau
         assert os.path.getsize(os.path.join(svg_dir, f)) > 0, f"{f} is empty"
 
     shutil.rmtree(tmp_dir)
-    print("PASS: export_kde_by_frame writes a flat PDF, with only SVGs in their own subfolder")
+    print("PASS: export_kde_by_frame writes a flat PDF+GIF, with only SVGs in their own subfolder")
+
+
+def test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps(tmp_dir='/tmp/claude-0/-home-user/8db9bf46-8a41-5caa-bf93-3b3ba7caed73/scratchpad/export_gif_test'):
+    import shutil
+    from PIL import Image, ImageSequence
+    if os.path.exists(tmp_dir):
+        shutil.rmtree(tmp_dir)
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for frame in [1, 2, 3, 4]:
+        for cond, offset in [('naive', 0), ('A1_1uM_vem', 5)]:
+            for _ in range(10):
+                rows.append({'frame': frame, 'condition': cond,
+                             'dim_0': rng.normal(offset, 1), 'dim_1': rng.normal(offset, 1)})
+    df = pd.DataFrame(rows)
+
+    export_kde_by_frame(df, 'condition', {'naive': 'tab:blue', 'A1_1uM_vem': 'tab:red'},
+                         tmp_dir, 'cell_umap', 'UMAP', fps=2)
+
+    gif_path = os.path.join(tmp_dir, 'cell_umap.gif')
+    assert os.path.getsize(gif_path) > 0, "cell_umap.gif is empty"
+
+    with Image.open(gif_path) as gif:
+        gif_frames = list(ImageSequence.Iterator(gif))
+        assert len(gif_frames) == 4, f"expected 4 GIF frames (one per input frame), got {len(gif_frames)}"
+
+        sizes = {f.size for f in gif_frames}
+        assert len(sizes) == 1, f"expected every GIF frame to have the SAME pixel size, got {sizes}"
+
+        # 2 fps -> 500ms per frame
+        durations = {f.info.get('duration') for f in gif_frames}
+        assert durations == {500}, f"expected 500ms/frame at fps=2, got {durations}"
+
+    shutil.rmtree(tmp_dir)
+    print("PASS: export_kde_by_frame's GIF has one frame per input frame, uniform size, and the right fps")
 
 
 def test_export_kde_writes_a_single_flat_pdf_and_svg():
@@ -323,6 +359,7 @@ def test_weighted_kde_legend_shows_total_weight():
 if __name__ == '__main__':
     test_legend_shows_well_sampled_groups_only()
     test_export_kde_by_frame_writes_pdf_and_one_svg_per_frame()
+    test_export_kde_by_frame_gif_has_one_frame_per_input_frame_at_the_right_fps()
     test_export_kde_writes_a_single_flat_pdf_and_svg()
     test_kde_contours_are_unfilled_outlines_at_default_levels()
     test_plot_embedding_with_kde_applies_explicit_xlim_ylim()

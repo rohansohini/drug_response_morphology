@@ -123,6 +123,7 @@ output/
 └── plots/
     └── {notebook_name}/
         ├── {modality}_{embedding}.pdf   # one combined, multi-page PDF, e.g. cell_umap.pdf
+        ├── {modality}_{embedding}.gif   # only for a per-frame (time-series) plot: the same pages, animated at 2fps
         ├── svgs/                        # one SVG per frame, e.g. cell_umap_frame_01.svg
         └── plot_data.csv                # the same data each plot above is drawn from
 ```
