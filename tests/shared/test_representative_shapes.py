@@ -12,7 +12,8 @@ import tifffile
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from shared.representative_shapes import (
-    assign_kmeans_regions, crop_cell_shape, pick_representative_shapes, plot_representative_shapes,
+    assign_kmeans_regions, crop_cell_shape, pick_representative_shapes,
+    plot_embedding_by_region, plot_representative_shapes, REGION_COLORS,
 )
 
 
@@ -120,9 +121,10 @@ def test_pick_representative_shapes_picks_the_cell_closest_to_each_centroid():
         print("PASS: pick_representative_shapes picks the real cell closest to each region's own centroid")
 
 
-def test_plot_representative_shapes_runs_without_error():
+def test_plot_embedding_by_region_runs_without_error():
     import matplotlib
     matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
 
     rng = np.random.default_rng(0)
     n = 20
@@ -130,17 +132,63 @@ def test_plot_representative_shapes_runs_without_error():
         'dim_0': rng.normal(0, 1, n), 'dim_1': rng.normal(0, 1, n),
         'region': [i % 2 for i in range(n)],
     })
+
+    fig = plot_embedding_by_region(df, 'UMAP', 'cell morphology (representative regions)')
+    assert fig is not None
+    plt.close(fig)
+
+    print("PASS: plot_embedding_by_region runs without error")
+
+
+def test_plot_representative_shapes_runs_without_error():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
     shapes = pd.DataFrame({
         'region': [0, 1], 'condition': ['naive', 'naive'], 'frame': [1, 1], 'pixel_id': [1, 2],
         'crop': [np.zeros((10, 10), dtype=np.uint16), np.ones((10, 10), dtype=np.uint16)],
     })
 
-    fig = plot_representative_shapes(df, shapes, 'UMAP', 'cell morphology (representative regions)')
+    fig = plot_representative_shapes(shapes, 'cell morphology (representative regions)')
     assert fig is not None
-    import matplotlib.pyplot as plt
     plt.close(fig)
 
     print("PASS: plot_representative_shapes runs without error")
+
+
+def test_plot_representative_shapes_handles_a_single_region():
+    # a single-subplot figure (n_regions=1) returns a bare Axes, not an
+    # array, from plt.subplots - must not crash when iterating over it
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    shapes = pd.DataFrame({
+        'region': [0], 'condition': ['naive'], 'frame': [1], 'pixel_id': [1],
+        'crop': [np.ones((10, 10), dtype=np.uint16)],
+    })
+
+    fig = plot_representative_shapes(shapes, 'cell morphology')
+    assert fig is not None
+    plt.close(fig)
+
+    print("PASS: plot_representative_shapes handles a single region without crashing")
+
+
+def test_region_colors_do_not_reuse_any_tab_color():
+    # every analysis using this module already uses the full matplotlib
+    # 'tab:*' palette elsewhere (condition/subclass/group colors) - a
+    # region color identical to one of those would make two unrelated
+    # categories look like the same thing across different plots
+    tab_colors = {
+        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+    }
+    assert not (set(c.lower() for c in REGION_COLORS) & tab_colors), (
+        "a REGION_COLORS entry collides with a standard matplotlib 'tab:*' color"
+    )
+    print("PASS: REGION_COLORS doesn't reuse any standard 'tab:*' color")
 
 
 if __name__ == '__main__':
@@ -149,5 +197,8 @@ if __name__ == '__main__':
     test_crop_cell_shape_same_size_even_near_image_edge()
     test_crop_cell_shape_warns_when_half_width_too_small()
     test_pick_representative_shapes_picks_the_cell_closest_to_each_centroid()
+    test_plot_embedding_by_region_runs_without_error()
     test_plot_representative_shapes_runs_without_error()
+    test_plot_representative_shapes_handles_a_single_region()
+    test_region_colors_do_not_reuse_any_tab_color()
     print("\nAll tests passed.")

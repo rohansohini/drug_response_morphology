@@ -9,8 +9,15 @@ from sklearn.cluster import KMeans
 
 from shared.cajal.extract_masks import extracted_mask_paths
 
-REGION_COLORS = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
-                  'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+# every analysis using this module already uses all 10 matplotlib
+# 'tab:*' colors elsewhere for something else (condition, subclass, or
+# group labels - e.g. CONDITION_COLORS/SUBCLASS_COLORS/GROUP_COLORS in
+# various notebooks) - reusing any of them here for k-means REGIONS
+# would make two unrelated categories look like the same thing across
+# different plots. These 5 (yellow, magenta, teal, navy, maroon) were
+# picked to stay visually distinct from every 'tab:*' color already in
+# use, and from each other.
+REGION_COLORS = ['#ffe119', '#f032e6', '#008080', '#000075', '#800000']
 
 
 def assign_kmeans_regions(df, n_regions, seed=42):
@@ -131,43 +138,58 @@ def pick_representative_shapes(df, masks_dir, modality, n_regions, half_width=15
     return df, pd.DataFrame(rows)
 
 
-def plot_representative_shapes(df, shapes, embedding_label, title):
+def plot_embedding_by_region(df, embedding_label, title):
     '''
-    One figure: a scatter of df's embedding colored by region (with each
-    region's centroid marked), next to a row of that region's actual
-    representative shape, bordered in the same color.
+    A scatter of df's embedding colored by region, with each region's
+    centroid marked with an X in that same color.
 
     Inputs:
         df:              from pick_representative_shapes - must have:
                          dim_0, dim_1, region
-        shapes:          from pick_representative_shapes
         embedding_label: axis label text only, e.g. 'UMAP' or 'PHATE'
         title:           figure title
     Outputs:
         fig: caller saves/closes this
     '''
-    n_regions = len(shapes)
-    fig = plt.figure(figsize=(6 + 2 * n_regions, 6))
-    grid = fig.add_gridspec(1, 2, width_ratios=[6, 2 * n_regions])
-    scatter_ax = fig.add_subplot(grid[0])
-    shape_axes = [fig.add_subplot(grid[1].subgridspec(1, n_regions)[0, i]) for i in range(n_regions)]
+    fig, ax = plt.subplots(figsize=(7, 6))
 
     for region, group in df.groupby('region'):
         color = REGION_COLORS[region % len(REGION_COLORS)]
-        scatter_ax.scatter(group['dim_0'], group['dim_1'], s=3, color=color, alpha=0.4,
-                            label=f'region {region} (n={len(group)})')
-    for _, shape_row in shapes.iterrows():
-        color = REGION_COLORS[shape_row['region'] % len(REGION_COLORS)]
-        center = df[df['region'] == shape_row['region']][['dim_0', 'dim_1']].mean()
-        scatter_ax.scatter(center['dim_0'], center['dim_1'], s=200, color=color,
-                            edgecolor='black', marker='X', zorder=3)
+        ax.scatter(group['dim_0'], group['dim_1'], s=3, color=color, alpha=0.4,
+                   label=f'region {region} (n={len(group)})')
+    for region in sorted(df['region'].unique()):
+        color = REGION_COLORS[region % len(REGION_COLORS)]
+        center = df[df['region'] == region][['dim_0', 'dim_1']].mean()
+        ax.scatter(center['dim_0'], center['dim_1'], s=200, color=color,
+                   edgecolor='black', marker='X', zorder=3)
 
-    scatter_ax.set_title(title)
-    scatter_ax.set_xlabel(f'{embedding_label} 1')
-    scatter_ax.set_ylabel(f'{embedding_label} 2')
-    scatter_ax.legend(fontsize=8)
+    ax.set_title(title)
+    ax.set_xlabel(f'{embedding_label} 1')
+    ax.set_ylabel(f'{embedding_label} 2')
+    ax.legend(fontsize=8)
 
-    for ax, (_, shape_row) in zip(shape_axes, shapes.iterrows()):
+    fig.tight_layout()
+    return fig
+
+
+def plot_representative_shapes(shapes, title):
+    '''
+    One row of each region's actual representative cell shape, bordered
+    in that region's own color (the same colors plot_embedding_by_region
+    marks its centroid with).
+
+    Inputs:
+        shapes: from pick_representative_shapes
+        title:  figure title
+    Outputs:
+        fig: caller saves/closes this
+    '''
+    n_regions = len(shapes)
+    fig, axes = plt.subplots(1, n_regions, figsize=(2.2 * n_regions, 2.6))
+    if n_regions == 1:
+        axes = [axes]
+
+    for ax, (_, shape_row) in zip(axes, shapes.iterrows()):
         color = REGION_COLORS[shape_row['region'] % len(REGION_COLORS)]
         ax.imshow(shape_row['crop'] > 0, cmap='gray_r')
         ax.set_title(f"region {shape_row['region']}", color=color)
@@ -177,6 +199,7 @@ def plot_representative_shapes(df, shapes, embedding_label, title):
             spine.set_edgecolor(color)
             spine.set_linewidth(3)
 
+    fig.suptitle(title)
     fig.tight_layout()
     return fig
 
@@ -184,26 +207,35 @@ def plot_representative_shapes(df, shapes, embedding_label, title):
 def export_representative_shapes(df, masks_dir, modality, n_regions, embedding_label, title, output_dir, file_prefix, half_width=150, seed=42):
     '''
     Full pipeline: cluster, pick each region's representative shape, plot,
-    and save. See pick_representative_shapes and plot_representative_shapes.
+    and save - as two SEPARATE figures/files, not one combined plot (see
+    plot_embedding_by_region and plot_representative_shapes):
 
-    output_dir/{file_prefix}.pdf
-    output_dir/svgs/{file_prefix}.svg
+    output_dir/{file_prefix}_embedding.pdf, output_dir/svgs/{file_prefix}_embedding.svg
+    output_dir/{file_prefix}_shapes.pdf,    output_dir/svgs/{file_prefix}_shapes.svg
 
-    Also displays the figure directly in the notebook's output, so you
-    don't have to open the saved files just to see it.
+    Also displays both figures directly in the notebook's output, so you
+    don't have to open the saved files just to see them.
 
     Outputs:
         df: from pick_representative_shapes, for notebook inspection
     '''
     df, shapes = pick_representative_shapes(df, masks_dir, modality, n_regions, half_width, seed)
-    fig = plot_representative_shapes(df, shapes, embedding_label, title)
 
     svg_dir = os.path.join(output_dir, 'svgs')
     os.makedirs(svg_dir, exist_ok=True)
-    fig.savefig(os.path.join(output_dir, f'{file_prefix}.pdf'), bbox_inches='tight')
-    fig.savefig(os.path.join(svg_dir, f'{file_prefix}.svg'), bbox_inches='tight')
-    display(fig)
-    plt.close(fig)
+
+    embedding_fig = plot_embedding_by_region(df, embedding_label, title)
+    embedding_fig.savefig(os.path.join(output_dir, f'{file_prefix}_embedding.pdf'), bbox_inches='tight')
+    embedding_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_embedding.svg'), bbox_inches='tight')
+    display(embedding_fig)
+    plt.close(embedding_fig)
+
+    shapes_fig = plot_representative_shapes(shapes, title)
+    shapes_fig.savefig(os.path.join(output_dir, f'{file_prefix}_shapes.pdf'), bbox_inches='tight')
+    shapes_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_shapes.svg'), bbox_inches='tight')
+    display(shapes_fig)
+    plt.close(shapes_fig)
+
     print(f"  Saved to {output_dir}")
 
     return df
