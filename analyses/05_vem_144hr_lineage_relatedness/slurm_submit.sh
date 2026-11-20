@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=52
 #SBATCH --mem=192G
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 #SBATCH --job-name=05_vem_144hr_lineage_relatedness
 #SBATCH --output=./logs/05_vem_144hr_lineage_relatedness_%j.out
 

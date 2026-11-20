@@ -34,7 +34,7 @@ Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just 
 
 ### [`vem_144hr_lineage_relatedness`](analyses/05_vem_144hr_lineage_relatedness/README.md)
 
-Asks whether sister cells, and separately cousin cells, are morphologically more alike than a random pair - compared before vs. after vemurafenib treatment, using the same `vem_1uM_144hrsbefore` dataset's full lineage tree (not just its frame-1-to-day-0 mapping).
+Asks whether sister cells, and separately cousin cells, are morphologically more alike than a random pair - compared before-drug vs. after-drug vemurafenib treatment, plus a wholly separate never-treated `naive` condition as a sanity-check control, using each condition's own full lineage tree (not just `vem`'s frame-1-to-day-0 mapping).
 
 ---
 
@@ -99,12 +99,12 @@ drug_response_morphology/
 │   │   └── output/                    # generated (gitignored)
 │   └── 05_vem_144hr_lineage_relatedness/
 │       ├── README.md
-│       ├── main.py                    # single-condition CAJAL run, no embedding
-│       ├── config.py                  # dataset name, control/treatment frame ranges, sampling, paths
+│       ├── main.py                    # two-condition (vem, naive) CAJAL run, no embedding
+│       ├── config.py                  # CONDITIONS (vem/naive), before/after-drug frame ranges, sampling, paths
 │       ├── select_cells.py            # flat per-frame sampling, no budget-splitting, no subclass
 │       ├── slurm_submit.sh
 │       ├── notebooks/
-│       └── output/                    # generated (gitignored)
+│       └── output/                    # generated (gitignored): output/{condition}/...
 ├── tests/
 │   ├── process_imaging_data/          # tests for process_imaging_data/
 │   ├── shared/                        # tests for shared/, no real data needed
@@ -127,7 +127,7 @@ output/
         └── plot_data.csv                # the same data each plot above is drawn from
 ```
 
-Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). The permutation-test notebooks instead export one row per permutation: `vem_pretreatment` has `modality`, `null_error`, `observed_error`, `p_value` (the last two repeated on every row of their modality, one `plot_data.csv` per condition); `vem_144hr_lineage_relatedness` has `modality`, `frame_range`, `null_distance`, `sister_mean_distance`/`sister_p_value`, `cousin_mean_distance`/`cousin_p_value` (repeated on every row of their modality+range group).
+Every notebook also exports its own `plot_data.csv` (`shared.load_data.export_plot_data`), so someone without this repo can recreate or extend a plot from raw numbers alone. For a scatter/KDE notebook (including the representative-shapes ones, minus the actual shape crops - those don't fit a flat CSV), it's one row per cell: `modality`, `embedding_method`, `dim_0`/`dim_1`, plus whatever metadata and grouping column that notebook used (`condition`, `subclass`, `frame`, `region`, ...). The distribution-vs-null notebooks instead export one row per individual value: `vem_pretreatment` has `modality`, `group` (`'real'`/`'null'`), `error`, `p_value` (repeated on every row of its own modality+group, one `plot_data.csv` per condition); `vem_144hr_lineage_relatedness`'s `01_relatedness.ipynb` has `modality`, `group` (before-drug/after-drug/naive), `series` (`'sisters'`/`'cousins'`/`'null'`), `distance`, `p_value`; its `02_relatedness_decay.ipynb` has `modality`, `group`, `degree`, `n_pairs`, `mean_distance`, `p_value`, `neg_log10_p` (one row per (modality, group, degree) point, not per individual value - that sweep plots trend lines, not distribution overlays).
 
 ---
 

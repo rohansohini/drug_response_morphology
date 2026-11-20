@@ -21,25 +21,27 @@ from select_cells import select_cells
 from shared.cajal.extract_masks import extract_masks
 from shared.cajal.run_cajal import run_cajal, needs_recompute
 
-# config.py's OUTPUT_DIR/MASKS_DIR/CAJAL_OUTPUT_DIR are relative paths,
-# which Python resolves against the current working directory at runtime,
-# not this script's own location - if main.py is ever invoked as
+# config.py's OUTPUT_DIR is a relative path, which Python resolves
+# against the current working directory at runtime, not this script's
+# own location - if main.py is ever invoked as
 # `python analyses/05_vem_144hr_lineage_relatedness/main.py` from
 # somewhere else (e.g. the repo root) rather than `cd`-ing into this
-# directory first, those paths would silently resolve under the WRONG
+# directory first, that path would silently resolve under the WRONG
 # directory, including possibly colliding with another analysis's
-# output. Re-anchor them to this script's own directory, same as every
-# notebook already does.
-config.OUTPUT_DIR       = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
-config.MASKS_DIR        = os.path.join(ANALYSIS_DIR, config.MASKS_DIR)
-config.CAJAL_OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.CAJAL_OUTPUT_DIR)
+# output. Re-anchor it to this script's own directory, same as every
+# notebook already does. config.output_dir()/masks_dir()/
+# cajal_output_dir() all derive from this one variable, so re-anchoring
+# it here is enough for every condition's own subtree too.
+config.OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
 
 
-def main():
-    os.makedirs(config.MASKS_DIR, exist_ok=True)
-    os.makedirs(config.CAJAL_OUTPUT_DIR, exist_ok=True)
+def process_condition(condition: str, drug: str, max_frame: int) -> None:
+    masks_dir        = config.masks_dir(condition)
+    cajal_output_dir = config.cajal_output_dir(condition)
+    os.makedirs(masks_dir, exist_ok=True)
+    os.makedirs(cajal_output_dir, exist_ok=True)
 
-    # --- step 1/3: select cells across every frame 1-config.TREATMENT_END_FRAME ---
+    # --- step 1/3: select cells across every frame 1-max_frame ---
     #  this is a flat per-frame subsample of the FULL metadata - the
     #  notebook separately re-reads that same full metadata (not just
     #  this selection) to reconstruct the true lineage tree, since a
@@ -47,11 +49,11 @@ def main():
     #  tracked, not just the ones that happened to survive this
     #  subsample (see shared/lineage_tree.py and the notebook's own
     #  "Method" section).
-    print("[1/3] Loading metadata and selecting cells...")
-    metadata = pd.read_csv(config.metadata_csv_path())
+    print(f"[1/3] ({condition}) Loading metadata and selecting cells...")
+    metadata = pd.read_csv(config.metadata_csv_path(condition))
 
     rng = np.random.default_rng(config.SAMPLE_SEED)
-    selected = select_cells(metadata, rng)
+    selected = select_cells(metadata, drug, max_frame, rng)
     selected['sampled'] = True   # extract_masks expects this column name
 
     print(f"  Selected {len(selected)} cells total across {selected['frame'].nunique()} frames")
@@ -59,28 +61,28 @@ def main():
         n = (selected['frame'] == frame).sum()
         print(f"    frame {frame}: {n} cells")
 
-    selected_path = os.path.join(config.CAJAL_OUTPUT_DIR, 'selected_metadata.csv')
+    selected_path = os.path.join(cajal_output_dir, 'selected_metadata.csv')
     selected.to_csv(selected_path, index=False)
     print(f"  Saved selection to {selected_path}")
 
     # --- step 2/3: extract masks for every selected cell ---
-    print("\n[2/3] Extracting masks...")
+    print(f"\n[2/3] ({condition}) Extracting masks...")
     extract_masks(
-        selected, config.DRUG, config.COMBINED_MASKS_DIR, config.MASKS_DIR,
+        selected, drug, config.COMBINED_MASKS_DIR, masks_dir,
         n_jobs=config.N_JOBS, pad_size=config.PAD_SIZE,
     )
 
     # --- step 3/3: run CAJAL once per modality ---
     #  the GW distance matrix this produces IS the morphology
     #  representation used downstream (see notebooks/01_relatedness.ipynb) -
-    #  no UMAP/PHATE embedding is fit here, since the permutation test
-    #  needs the real distances, not a 2D projection that distorts them.
-    print("\n[3/3] Running CAJAL...")
-    cell_dir = os.path.join(config.MASKS_DIR, 'cell')
-    nuc_dir  = os.path.join(config.MASKS_DIR, 'nuc')
+    #  no UMAP/PHATE embedding is fit here, since the test needs the real
+    #  distances, not a 2D projection that distorts them.
+    print(f"\n[3/3] ({condition}) Running CAJAL...")
+    cell_dir = os.path.join(masks_dir, 'cell')
+    nuc_dir  = os.path.join(masks_dir, 'nuc')
 
-    cell_dist_csv = os.path.join(config.CAJAL_OUTPUT_DIR, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
-    nuc_dist_csv  = os.path.join(config.CAJAL_OUTPUT_DIR, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
+    cell_dist_csv = os.path.join(cajal_output_dir, f"cell_qgw_{config.N_POINTS:03d}P_dists.csv")
+    nuc_dist_csv  = os.path.join(cajal_output_dir, f"nuc_qgw_{config.N_POINTS:03d}P_dists.csv")
 
     # figure out how many of {cell, nuc} actually need to run BEFORE
     # deciding how many cores to give each one - splitting config.N_JOBS in
@@ -106,13 +108,20 @@ def main():
 
         tasks = []
         if needs_cajal['cell']:
-            tasks.append(delayed(run_cajal)(cell_dir, config.CAJAL_OUTPUT_DIR, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+            tasks.append(delayed(run_cajal)(cell_dir, cajal_output_dir, 'cell', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
         if needs_cajal['nuc']:
-            tasks.append(delayed(run_cajal)(nuc_dir, config.CAJAL_OUTPUT_DIR, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
+            tasks.append(delayed(run_cajal)(nuc_dir, cajal_output_dir, 'nuc', config.N_POINTS, per_task_jobs, config.N_CLUSTERS))
 
         Parallel(n_jobs=n_tasks)(tasks)
 
-    print("\nDone.")
+
+def main():
+    for condition, info in config.CONDITIONS.items():
+        print(f"=== {condition} ({info['drug']}) ===")
+        process_condition(condition, info['drug'], info['max_frame'])
+        print()
+
+    print("Done.")
 
 
 if __name__ == '__main__':
