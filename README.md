@@ -20,21 +20,21 @@ Each analysis is self-contained under `analyses/<name>/`, with its own README co
 
 Compares cell and nuclear morphology between the `naive` and `vem_1uM` conditions over time, via a shared CAJAL embedding sampled across both conditions.
 
-### [`vem_pretreatment`](analyses/02_vem_pretreatment/README.md)
-
-Asks whether a cell's shape *before* vemurafenib treatment predicts what it eventually becomes, via a k-nearest-neighbor prediction test directly on CAJAL distances. Runs the same question for two pre-treatment durations (`vem_1uM_48hrsbefore`, `vem_1uM_144hrsbefore`).
-
-### [`multi_drug_comparison`](analyses/03_multi_drug_comparison/README.md)
+### [`multi_drug_comparison`](analyses/02_multi_drug_comparison/README.md)
 
 Compares cell and nuclear morphology across four conditions (`naive`, `vem_1uM`, `gem_2.5nM`, `tram_6nM`) over every frame shared by all of them, sharing one CAJAL embedding per modality across every frame.
 
-### [`vem_full_timecourse`](analyses/04_vem_full_timecourse/README.md)
+### [`vem_pretreatment`](analyses/03_vem_pretreatment/README.md)
 
-Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
+Asks whether a cell's shape *before* vemurafenib treatment predicts what it eventually becomes, via a k-nearest-neighbor prediction test directly on CAJAL distances. Runs the same question for two pre-treatment durations (`vem_1uM_48hrsbefore`, `vem_1uM_144hrsbefore`).
 
-### [`vem_144hr_lineage_relatedness`](analyses/05_vem_144hr_lineage_relatedness/README.md)
+### [`vem_144hr_lineage_relatedness`](analyses/04_vem_144hr_lineage_relatedness/README.md)
 
 Asks whether sister cells, and separately cousin cells, are morphologically more alike than a random pair - compared before-drug vs. after-drug vemurafenib treatment, plus a wholly separate never-treated `naive` condition as a sanity-check control, using each condition's own full lineage tree (not just `vem`'s frame-1-to-day-0 mapping).
+
+### [`vem_full_timecourse`](analyses/05_vem_full_timecourse/README.md)
+
+Runs CAJAL on `vem_1uM` alone, across its entire available timecourse (not just the first 13 frames), to test whether its subclasses separate more clearly later than the frame range `naive_vs_vem` uses.
 
 ---
 
@@ -74,14 +74,7 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/                 # the 6 notebooks (see analyses/01_naive_vs_vem/README.md)
 │   │   └── output/                    # generated (gitignored)
-│   ├── 02_vem_pretreatment/
-│   │   ├── README.md
-│   │   ├── main.py                    # loops over both conditions in one job
-│   │   ├── config.py                  # CONDITIONS (per-duration drug name, day0_frame), frames, paths
-│   │   ├── slurm_submit.sh
-│   │   ├── notebooks/
-│   │   └── output/                    # generated (gitignored): output/{condition}/...
-│   ├── 03_multi_drug_comparison/
+│   ├── 02_multi_drug_comparison/
 │   │   ├── README.md
 │   │   ├── main.py                    # one CAJAL run per modality, pooling every shared frame together
 │   │   ├── config.py                  # conditions, frames, sample size per condition, paths
@@ -89,30 +82,37 @@ drug_response_morphology/
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
 │   │   └── output/                    # generated (gitignored)
-│   ├── 04_vem_full_timecourse/
+│   ├── 03_vem_pretreatment/
 │   │   ├── README.md
-│   │   ├── main.py                    # single-condition CAJAL run, every available frame
-│   │   ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
-│   │   ├── select_cells.py            # single-condition water-filled sampling, no frame cap
+│   │   ├── main.py                    # loops over both conditions in one job
+│   │   ├── config.py                  # CONDITIONS (per-duration drug name, day0_frame), frames, paths
 │   │   ├── slurm_submit.sh
 │   │   ├── notebooks/
-│   │   └── output/                    # generated (gitignored)
-│   └── 05_vem_144hr_lineage_relatedness/
+│   │   └── output/                    # generated (gitignored): output/{condition}/...
+│   ├── 04_vem_144hr_lineage_relatedness/
+│   │   ├── README.md
+│   │   ├── main.py                    # two-condition (vem, naive) CAJAL run, no embedding
+│   │   ├── config.py                  # CONDITIONS (vem/naive), before/after-drug frame ranges, sampling, paths
+│   │   ├── select_cells.py            # flat per-frame sampling, no budget-splitting, no subclass
+│   │   ├── slurm_submit.sh
+│   │   ├── notebooks/
+│   │   └── output/                    # generated (gitignored): output/{condition}/...
+│   └── 05_vem_full_timecourse/
 │       ├── README.md
-│       ├── main.py                    # two-condition (vem, naive) CAJAL run, no embedding
-│       ├── config.py                  # CONDITIONS (vem/naive), before/after-drug frame ranges, sampling, paths
-│       ├── select_cells.py            # flat per-frame sampling, no budget-splitting, no subclass
+│       ├── main.py                    # single-condition CAJAL run, every available frame
+│       ├── config.py                  # drug (fixed to vem_1uM), sampling budget, paths
+│       ├── select_cells.py            # single-condition water-filled sampling, no frame cap
 │       ├── slurm_submit.sh
 │       ├── notebooks/
-│       └── output/                    # generated (gitignored): output/{condition}/...
+│       └── output/                    # generated (gitignored)
 ├── tests/
 │   ├── process_imaging_data/          # tests for process_imaging_data/
 │   ├── shared/                        # tests for shared/, no real data needed
 │   └── analyses/
 │       ├── 01_naive_vs_vem/
-│       ├── 03_multi_drug_comparison/
-│       ├── 04_vem_full_timecourse/
-│       └── 05_vem_144hr_lineage_relatedness/
+│       ├── 02_multi_drug_comparison/
+│       ├── 04_vem_144hr_lineage_relatedness/
+│       └── 05_vem_full_timecourse/
 └── environment.yml                    # shared across every analysis and process_imaging_data
 ```
 

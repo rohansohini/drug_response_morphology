@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH --account=b1042
+#SBATCH --partition=genomics
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=256G
+#SBATCH --time=24:00:00
+#SBATCH --job-name=05_vem_full_timecourse
+#SBATCH --output=./logs/05_vem_full_timecourse_%j.out
+
+module purge
+eval "$(conda shell.bash hook)"
+
+cd /gpfs/projects/b1042/GoyalLab/sohini/drug_response_morphology/analyses/05_vem_full_timecourse
+conda activate drug_morpho
+
+# unbuffer stdout so print() shows up in the log in real time, instead of
+# sitting in a buffer until it fills up (which also made CAJAL/UMAP/PHATE's
+# progress interleave out of order with stderr warnings, which are unbuffered)
+export PYTHONUNBUFFERED=1
+
+mkdir -p logs
+python main.py
