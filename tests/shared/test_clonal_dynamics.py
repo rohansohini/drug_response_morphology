@@ -7,11 +7,13 @@ import tempfile
 
 import numpy as np
 import pandas as pd
+import tifffile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from shared.clonal_dynamics import (
-    CLONE_COLORS, pick_tightest_clones, plot_clones_on_embedding, export_clones_by_subclass,
+    CLONE_COLORS, pick_tightest_clones, select_clones_by_subclass, pick_clone_medoid,
+    plot_clones_on_embedding, plot_clone_shapes, export_clones_by_subclass,
 )
 
 
@@ -131,6 +133,120 @@ def test_pick_tightest_clones_returns_fewer_than_n_clones_if_not_enough_eligible
     print("PASS: pick_tightest_clones returns fewer than n_clones when fewer are eligible, rather than erroring")
 
 
+def test_select_clones_by_subclass_matches_calling_pick_tightest_clones_directly():
+    # select_clones_by_subclass is just a per-subclass loop around
+    # pick_tightest_clones - confirm it gives the exact same answer as
+    # calling pick_tightest_clones by hand per subclass, since the whole
+    # point of splitting it out is to call it ONCE per modality (see
+    # shared/clonal_dynamics.py's own docstring) rather than once per
+    # embedding method
+    embedded_df = pd.DataFrame({
+        'lin_id':  ['a_tight', 'a_tight', 'a_loose', 'a_loose', 'b_only', 'b_only'],
+        'subclass': ['persisting'] * 4 + ['fast_prolif'] * 2,
+        'frame':   [0, 1, 0, 1, 0, 1],
+        'pixel_id': [1, 2, 3, 4, 5, 6],
+    })
+    label_to_index = {(0, 1): 0, (1, 2): 1, (0, 3): 2, (1, 4): 3, (0, 5): 4, (1, 6): 5}
+    dist_matrix = _block_distance_matrix(6, {
+        'a_tight': ([0, 1], 0.1),
+        'a_loose': ([2, 3], 9.0),
+        'b_only':  ([4, 5], 1.0),
+    })
+
+    selections = select_clones_by_subclass(
+        embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=2,
+        subclasses=['persisting', 'fast_prolif'],
+    )
+
+    expected_persisting = pick_tightest_clones(
+        embedded_df[embedded_df['subclass'] == 'persisting'], dist_matrix, label_to_index, 2, 2,
+    )
+    expected_fast_prolif = pick_tightest_clones(
+        embedded_df[embedded_df['subclass'] == 'fast_prolif'], dist_matrix, label_to_index, 2, 2,
+    )
+
+    assert selections['persisting'][0] == expected_persisting[0]
+    assert selections['fast_prolif'][0] == expected_fast_prolif[0]
+    assert set(selections.keys()) == {'persisting', 'fast_prolif'}
+
+    print("PASS: select_clones_by_subclass matches calling pick_tightest_clones directly, once per subclass")
+
+
+def test_pick_clone_medoid_picks_the_cell_closest_to_the_rest_of_its_own_clone():
+    # 4 cells: pixel_id 11 has the lowest mean distance to the other 3
+    # (cells 12/13 are clustered near it; cell 10 is far from everyone) -
+    # it must win, even though it is NOT the simple average-position
+    # pick in 2D (that distinction is the whole point of using the real
+    # distance matrix instead of the UMAP/PHATE projection)
+    dist_matrix = np.array([
+        [0, 5, 5, 5],
+        [5, 0, 1, 1],
+        [5, 1, 0, 2],
+        [5, 1, 2, 0],
+    ], dtype=float)
+    label_to_index = {(1, 10): 0, (1, 11): 1, (1, 12): 2, (1, 13): 3}
+    clone_df = pd.DataFrame({
+        'condition': ['vem_1uM'] * 4, 'frame': [1, 1, 1, 1], 'pixel_id': [10, 11, 12, 13],
+    })
+
+    medoid = pick_clone_medoid(clone_df, dist_matrix, label_to_index)
+
+    assert medoid['pixel_id'] == 11, f"expected pixel_id 11 (lowest mean distance to the rest), got {medoid['pixel_id']}"
+
+    print("PASS: pick_clone_medoid picks the cell with the lowest mean real distance to the rest of its own clone")
+
+
+def test_pick_clone_medoid_ignores_cells_missing_from_the_distance_matrix():
+    # a clone_df row with no matching (frame, pixel_id) in label_to_index
+    # must simply be excluded from the medoid search, not raise
+    dist_matrix = np.array([[0, 1], [1, 0]], dtype=float)
+    label_to_index = {(1, 10): 0, (1, 11): 1}
+    clone_df = pd.DataFrame({
+        'condition': ['vem_1uM'] * 3, 'frame': [1, 1, 1], 'pixel_id': [10, 11, 999],   # 999 has no matrix entry
+    })
+
+    medoid = pick_clone_medoid(clone_df, dist_matrix, label_to_index)
+
+    assert medoid['pixel_id'] in (10, 11), f"expected the medoid to come from the 2 resolvable cells, got {medoid['pixel_id']}"
+
+    print("PASS: pick_clone_medoid ignores cells with no matching distance-matrix entry")
+
+
+def test_plot_clone_shapes_runs_without_error():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    crops = {'lin1': np.ones((20, 20), dtype=np.uint16), 'lin2': np.zeros((20, 20), dtype=np.uint16)}
+    fig = plot_clone_shapes(crops, ['lin1', 'lin2'], CLONE_COLORS[:2], 'test title')
+    assert fig is not None
+    assert len(fig.axes) == 2
+    plt.close(fig)
+
+    print("PASS: plot_clone_shapes runs without error for 2 clones")
+
+
+def test_plot_clone_shapes_always_renders_n_panels_with_a_placeholder_for_missing_ones():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    crop = np.ones((20, 20), dtype=np.uint16)
+    fig_partial = plot_clone_shapes({'lin1': crop}, ['lin1'], [CLONE_COLORS[0]], 'title', n_panels=2)
+    fig_full = plot_clone_shapes({'lin1': crop, 'lin2': crop}, ['lin1', 'lin2'], CLONE_COLORS[:2], 'title', n_panels=2)
+
+    assert len(fig_partial.axes) == 2, f"expected 2 panels even with only 1 clone's shape, got {len(fig_partial.axes)}"
+    assert fig_partial.get_size_inches().tolist() == fig_full.get_size_inches().tolist(), (
+        "a figure with a missing clone shape must be the exact same size as one with every slot filled"
+    )
+    assert any('no eligible' in t.get_text() for t in fig_partial.axes[1].texts)
+
+    plt.close(fig_partial)
+    plt.close(fig_full)
+
+    print("PASS: plot_clone_shapes always renders n_panels, same size whether or not every slot has a shape")
+
+
 def test_plot_clones_on_embedding_runs_without_error():
     import matplotlib
     matplotlib.use('Agg')
@@ -228,7 +344,7 @@ def _synthetic_embedded_df_and_distances(seed=0):
                 pixel_counter += 1
                 rows.append({
                     'lin_id': lin_id, 'subclass': subclass, 'frame': frame, 'pixel_id': pixel_id,
-                    'dim_0': rng.normal(0, 1), 'dim_1': rng.normal(0, 1),
+                    'condition': 'vem_1uM', 'dim_0': rng.normal(0, 1), 'dim_1': rng.normal(0, 1),
                 })
                 label_to_index[(frame, pixel_id)] = idx
                 indices.append(idx)
@@ -240,13 +356,50 @@ def _synthetic_embedded_df_and_distances(seed=0):
     return embedded_df, dist_matrix, label_to_index
 
 
+def _write_synthetic_masks(embedded_df, masks_dir, half_width_floor=10):
+    '''
+    One mask TIFF per frame, per modality ('cell' and 'nuc', identical
+    content - the test doesn't care which modality it crops from), with
+    every pixel_id present at that frame placed as its own small square
+    blob at a distinct grid position, far enough apart that half_width
+    crops never bleed into a neighboring cell's own pixels.
+    '''
+    for subdir in ('cell', 'nuc'):
+        os.makedirs(os.path.join(masks_dir, subdir), exist_ok=True)
+
+    spacing = 4 * half_width_floor
+    for frame, frame_df in embedded_df.groupby('frame'):
+        pixel_ids = sorted(frame_df['pixel_id'].unique())
+        n_cols = max(1, int(np.ceil(np.sqrt(len(pixel_ids)))))
+        canvas_size = spacing * (n_cols + 2)
+        mask = np.zeros((canvas_size, canvas_size), dtype=np.uint16)
+
+        for i, pixel_id in enumerate(pixel_ids):
+            row, col = divmod(i, n_cols)
+            cy, cx = spacing * (row + 1), spacing * (col + 1)
+            mask[cy - half_width_floor:cy + half_width_floor, cx - half_width_floor:cx + half_width_floor] = pixel_id
+
+        condition = frame_df['condition'].iloc[0]
+        for subdir in ('cell', 'nuc'):
+            path = os.path.join(masks_dir, subdir, f"{condition}_frame_{int(frame):02d}_{subdir}_mask_sampled.tiff")
+            tifffile.imwrite(path, mask)
+
+
 def test_export_clones_by_subclass_writes_png_svg_and_summary_csv_per_subclass():
     embedded_df, dist_matrix, label_to_index = _synthetic_embedded_df_and_distances()
+    subclasses = ['persisting', 'slow_prolif', 'fast_prolif', 'dying']
+
+    selections = select_clones_by_subclass(
+        embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=10, subclasses=subclasses,
+    )
 
     with tempfile.TemporaryDirectory() as tmp_dir:
+        masks_dir = os.path.join(tmp_dir, 'masks')
+        _write_synthetic_masks(embedded_df, masks_dir, half_width_floor=10)
+
         combined = export_clones_by_subclass(
-            embedded_df, dist_matrix, label_to_index, tmp_dir, 'cell_umap', 'UMAP', 'cell morphology',
-            n_clones=2, min_embedded_cells=10, subclasses=['persisting', 'slow_prolif', 'fast_prolif', 'dying'],
+            embedded_df, selections, dist_matrix, label_to_index, masks_dir, 'cell',
+            tmp_dir, 'cell_umap', 'UMAP', 'cell morphology', n_clones=2, half_width=10,
         )
 
         assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting.png'))
@@ -254,22 +407,33 @@ def test_export_clones_by_subclass_writes_png_svg_and_summary_csv_per_subclass()
         assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_fast_prolif.png'))
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_fast_prolif.svg'))
 
+        # the medoid-shapes row is a SEPARATE file from the embedding
+        # scatter, same "export embedding and shapes separately"
+        # convention as shared.representative_shapes
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_persisting_shapes.png'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_persisting_shapes.svg'))
+
         # 'dying' has ZERO eligible clones (its only candidate is below
-        # min_embedded_cells) - it must still get a PNG/SVG (all-placeholder
-        # panels), not be silently skipped, so every requested subclass's
-        # image stays present and the same size as its siblings
-        dying_png_path = os.path.join(tmp_dir, 'cell_umap_dying.png')
-        assert os.path.isfile(dying_png_path), "a subclass with zero eligible clones must still get a placeholder PNG"
+        # min_embedded_cells) - it must still get PNG/SVGs (all-placeholder
+        # panels, for both the embedding scatter and the shapes row), not
+        # be silently skipped, so every requested subclass's images stay
+        # present and the same size as their siblings
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_dying.png')), \
+            "a subclass with zero eligible clones must still get a placeholder PNG"
         assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_dying.svg'))
+        assert os.path.isfile(os.path.join(tmp_dir, 'cell_umap_dying_shapes.png')), \
+            "a subclass with zero eligible clones must still get a placeholder shapes PNG too"
+        assert os.path.isfile(os.path.join(tmp_dir, 'svgs', 'cell_umap_dying_shapes.svg'))
 
         summary_csv_path = os.path.join(tmp_dir, 'cell_umap_clone_summary.csv')
         assert os.path.isfile(summary_csv_path)
         on_disk = pd.read_csv(summary_csv_path)
-        assert set(on_disk.columns) == {'subclass', 'lin_id', 'n_cells', 'mean_pairwise_distance'}
+        assert set(on_disk.columns) == {'subclass', 'lin_id', 'n_cells', 'mean_pairwise_distance', 'medoid_frame', 'medoid_pixel_id'}
 
         persisting_rows = on_disk[on_disk['subclass'] == 'persisting']
         assert list(persisting_rows['lin_id']) == ['p_tight', 'p_mid'], \
             f"expected the 2 tightest persisting clones in tightness order, got {list(persisting_rows['lin_id'])}"
+        assert persisting_rows['medoid_pixel_id'].notna().all(), "every eligible clone must have a resolved medoid"
 
         slow_prolif_rows = on_disk[on_disk['subclass'] == 'slow_prolif']
         assert len(slow_prolif_rows) == 1, f"expected only 1 eligible slow_prolif clone, got {len(slow_prolif_rows)}"
@@ -279,12 +443,13 @@ def test_export_clones_by_subclass_writes_png_svg_and_summary_csv_per_subclass()
         assert list(fast_prolif_rows['lin_id']) == ['f_tight', 'f_loose']
 
         dying_rows = on_disk[on_disk['subclass'] == 'dying']
-        assert dying_rows.empty, "dying has zero eligible clones - it should contribute no summary rows, even though it still got a placeholder figure"
+        assert dying_rows.empty, "dying has zero eligible clones - it should contribute no summary rows, even though it still got placeholder figures"
 
         assert len(combined) == len(on_disk)
 
-    print("PASS: export_clones_by_subclass picks the tightest clones per subclass, writes a PNG+SVG per subclass, "
-          "and a combined summary CSV - handling a subclass with fewer than n_clones eligible clones")
+    print("PASS: export_clones_by_subclass picks the tightest clones per subclass, writes embedding+shapes PNG+SVG "
+          "pairs per subclass (with medoid info in the combined summary CSV) - handling a subclass with fewer than "
+          "n_clones eligible clones")
 
 
 def test_clone_colors_do_not_reuse_any_tab_color_or_region_color():
@@ -308,6 +473,11 @@ if __name__ == '__main__':
     test_pick_tightest_clones_filters_by_min_embedded_cells()
     test_pick_tightest_clones_skips_labels_missing_from_the_distance_matrix()
     test_pick_tightest_clones_returns_fewer_than_n_clones_if_not_enough_eligible()
+    test_select_clones_by_subclass_matches_calling_pick_tightest_clones_directly()
+    test_pick_clone_medoid_picks_the_cell_closest_to_the_rest_of_its_own_clone()
+    test_pick_clone_medoid_ignores_cells_missing_from_the_distance_matrix()
+    test_plot_clone_shapes_runs_without_error()
+    test_plot_clone_shapes_always_renders_n_panels_with_a_placeholder_for_missing_ones()
     test_plot_clones_on_embedding_runs_without_error()
     test_plot_clones_on_embedding_handles_a_single_clone()
     test_plot_clones_on_embedding_always_renders_n_panels_the_same_size()

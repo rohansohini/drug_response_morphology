@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 from IPython.display import display
 
+from shared.cajal.extract_masks import extracted_mask_paths
+from shared.representative_shapes import crop_cell_shape
+
 # distinct from every condition/subclass/group 'tab:*' color already used
 # elsewhere in this repo, AND from shared.representative_shapes'
 # REGION_COLORS (#ffe119/#f032e6/#008080/#000075/#800000 - see that
@@ -26,6 +29,14 @@ def pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, m
     rule this repo already follows everywhere else a quantitative claim
     is made, e.g. shared/pair_similarity.py) - among lin_ids with enough
     cells in the embedded sample to make that mean meaningful.
+
+    This is the expensive part of clone selection (it slices a
+    submatrix out of the full distance matrix for every lin_id, not
+    just the ones that end up chosen) - see select_clones_by_subclass,
+    which calls this once per subclass and should itself only be called
+    ONCE PER MODALITY, never once per embedding method (UMAP vs PHATE
+    never changes which lin_ids are tightest, since this never looks at
+    dim_0/dim_1 at all).
 
     Inputs:
         embedded_df:        the CAJAL-embedded subset (has lin_id,
@@ -74,6 +85,69 @@ def pick_tightest_clones(embedded_df, dist_matrix, label_to_index, n_clones=2, m
 
     top = summary.head(n_clones)
     return top.index.tolist(), top
+
+
+def select_clones_by_subclass(embedded_df, dist_matrix, label_to_index, n_clones=2, min_embedded_cells=10,
+                               subclasses=SUBCLASSES):
+    '''
+    Run pick_tightest_clones once per subclass. This is the expensive,
+    real-distance-based half of clone selection, and it depends ONLY on
+    lin_id/frame/pixel_id/subclass and the CAJAL distance matrix - NEVER
+    on which 2D embedding method (UMAP vs PHATE) the result will
+    eventually be painted onto. Call this ONCE PER MODALITY and reuse
+    its result across every embedding method's own export_clones_by_subclass
+    call: calling pick_tightest_clones again per embedding method would
+    redo the same expensive per-lineage distance-matrix work for an
+    answer that cannot change.
+
+    Inputs:
+        embedded_df:  the CAJAL-embedded subset for one modality (has
+                      lin_id, frame, pixel_id, subclass) - dim_0/dim_1
+                      may be present but are never used here
+        dist_matrix, label_to_index: see pick_tightest_clones
+        n_clones, min_embedded_cells: see pick_tightest_clones
+        subclasses:   which subclass values to select clones for
+    Outputs:
+        selections: {subclass: (lin_ids, summary)} - see pick_tightest_clones
+    '''
+    selections = {}
+    for subclass in subclasses:
+        embedded_subset = embedded_df[embedded_df['subclass'] == subclass]
+        selections[subclass] = pick_tightest_clones(embedded_subset, dist_matrix, label_to_index, n_clones, min_embedded_cells)
+    return selections
+
+
+def pick_clone_medoid(clone_df, dist_matrix, label_to_index, frame_col='frame', pixel_id_col='pixel_id'):
+    '''
+    The one cell in a clone's own embedded cells with the lowest mean
+    real CAJAL distance to every other cell in that same clone (the
+    medoid) - the most centrally-located cell in TRUE morphology space,
+    not the UMAP/PHATE 2D projection (which distorts distances, so
+    "closest to the average point in the picture" is not guaranteed to
+    be the cell with the most typical actual shape).
+
+    Inputs:
+        clone_df:       one clone's own embedded rows (has condition,
+                        frame, pixel_id) - e.g. embedded_subset
+                        restricted to one lin_id, the same clone_dfs
+                        entry export_clones_by_subclass already builds
+        dist_matrix, label_to_index: see pick_tightest_clones - the
+                        SAME modality clone_df came from
+        frame_col, pixel_id_col: column names
+    Outputs:
+        medoid_row: the clone_df row (a pandas Series) for the medoid cell
+    '''
+    resolved = [
+        (frame, pixel_id) in label_to_index
+        for frame, pixel_id in zip(clone_df[frame_col], clone_df[pixel_id_col])
+    ]
+    rows = clone_df[resolved].reset_index(drop=True)
+    assert len(rows) > 0, "no cell in this clone resolves to the distance matrix - can't pick a medoid"
+
+    indices = np.array([label_to_index[(frame, pixel_id)] for frame, pixel_id in zip(rows[frame_col], rows[pixel_id_col])])
+    sub = dist_matrix[np.ix_(indices, indices)]
+    medoid_pos = sub.mean(axis=1).argmin()
+    return rows.iloc[medoid_pos]
 
 
 def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embedding_label, title, n_panels=None):
@@ -138,40 +212,118 @@ def plot_clones_on_embedding(background_df, clone_dfs, lin_ids, colors, embeddin
     return fig
 
 
-def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_dir, file_prefix, embedding_label,
-                               title_prefix, n_clones=2, min_embedded_cells=10, colors=CLONE_COLORS,
-                               subclasses=SUBCLASSES):
+def plot_clone_shapes(crops_by_lin_id, lin_ids, colors, title, n_panels=None):
     '''
-    For each subclass, pick the n_clones tightest-clustered lin_ids (see
-    pick_tightest_clones) and paint them onto embedded_df's embedding
-    (see plot_clones_on_embedding) - one PNG/SVG figure per subclass:
+    One row of each clone's own medoid cell's actual shape (see
+    pick_clone_medoid), bordered in that clone's own color - the same
+    colors plot_clones_on_embedding uses, and the same layout/
+    placeholder convention as
+    shared.representative_shapes.plot_representative_shapes.
 
-    output_dir/{file_prefix}_{subclass}.png, output_dir/svgs/{file_prefix}_{subclass}.svg
+    ALWAYS renders exactly n_panels panels (see plot_clones_on_embedding's
+    own docstring for why) - a clone slot with no crop gets a "no
+    eligible clone" placeholder instead of shrinking the figure.
+
+    Inputs:
+        crops_by_lin_id: {lin_id: crop array} - one entry per clone that
+                         has a medoid shape; may have fewer entries than
+                         n_panels
+        lin_ids:         [lin_id, ...] in panel order - same list/order
+                         plot_clones_on_embedding was given for this
+                         same subclass
+        colors:          [color, ...] - same order/length as lin_ids
+        title:           figure suptitle
+        n_panels:        how many panels to render; defaults to len(lin_ids)
+    Outputs:
+        fig: caller saves/closes this
+    '''
+    n_panels = n_panels if n_panels is not None else len(lin_ids)
+    fig, axes = plt.subplots(1, n_panels, figsize=(2.2 * n_panels, 2.6))
+    if n_panels == 1:
+        axes = [axes]
+
+    for i, ax in enumerate(axes):
+        lin_id = lin_ids[i] if i < len(lin_ids) else None
+        crop = crops_by_lin_id.get(lin_id) if lin_id is not None else None
+        color = colors[i] if i < len(colors) else 'lightgrey'
+
+        if crop is not None:
+            ax.imshow(crop > 0, cmap='gray_r')
+            ax.set_title(f'lin_id {lin_id}', color=color, fontsize=8)
+        else:
+            ax.text(0.5, 0.5, 'no eligible\nclone', ha='center', va='center',
+                     fontsize=8, color='grey', transform=ax.transAxes)
+
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_edgecolor(color if crop is not None else 'lightgrey')
+            spine.set_linewidth(3)
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    return fig
+
+
+def export_clones_by_subclass(embedded_df, selections, dist_matrix, label_to_index, masks_dir, modality,
+                               output_dir, file_prefix, embedding_label, title_prefix,
+                               n_clones=2, half_width=150, colors=CLONE_COLORS):
+    '''
+    Paint each subclass's ALREADY-SELECTED clones (see
+    select_clones_by_subclass) onto embedded_df's own embedding, and
+    separately crop each clone's own medoid cell's actual shape (see
+    pick_clone_medoid) - two SEPARATE PNG/SVG figures per subclass, same
+    "export embedding and shapes separately" pattern as
+    shared.representative_shapes.export_representative_shapes:
+
+    output_dir/{file_prefix}_{subclass}.png,        output_dir/svgs/{file_prefix}_{subclass}.svg
+    output_dir/{file_prefix}_{subclass}_shapes.png, output_dir/svgs/{file_prefix}_{subclass}_shapes.svg
 
     Also writes one combined output_dir/{file_prefix}_clone_summary.csv
     (every chosen clone, every subclass, with its n_cells/
-    mean_pairwise_distance) so the exact selection stays reproducible/
-    inspectable without re-running this function, and displays every
-    figure directly in the notebook's output.
+    mean_pairwise_distance/medoid_frame/medoid_pixel_id) so the exact
+    selection and medoid choice stay reproducible/inspectable without
+    re-running this function, and displays every figure directly in the
+    notebook's output.
+
+    This is pure plotting/cropping - clone SELECTION already happened in
+    select_clones_by_subclass. Call THIS function once per embedding
+    method (its plots depend on dim_0/dim_1, which differ between UMAP
+    and PHATE), passing the SAME `selections` dict each time.
 
     Inputs:
-        embedded_df:     the CAJAL-embedded subset for one condition
-                         (has dim_0, dim_1, subclass, lin_id, frame,
-                         pixel_id) - e.g. from load_full_dataset. Also
-                         used as EVERY panel's own grey background, so
-                         clones are shown in context of the whole
-                         condition's embedding, not just their own subclass.
-        dist_matrix, label_to_index: see pick_tightest_clones - the SAME
-                         condition/modality this embedded_df came from
+        embedded_df:  the CAJAL-embedded subset for one condition (has
+                      dim_0, dim_1, subclass, lin_id, frame, pixel_id,
+                      condition) - e.g. from load_full_dataset. Also
+                      used as EVERY embedding panel's own grey
+                      background.
+        selections:   {subclass: (lin_ids, summary)} from
+                      select_clones_by_subclass - the SAME dict reused
+                      across every embedding method's own call, for the
+                      same modality.
+        dist_matrix, label_to_index: see pick_tightest_clones/
+                      pick_clone_medoid - the SAME modality this
+                      embedded_df and `selections` came from
+        masks_dir:    an analysis's own config.MASKS_DIR (or
+                      config.masks_dir(condition) for a per-condition
+                      layout) - where extract_masks wrote this
+                      condition's extracted mask TIFFs
+        modality:     'cell' or 'nuc' - which of a frame's two extracted
+                      mask files to crop from
         output_dir, file_prefix: as elsewhere in this repo (see shared.density_plots, shared.representative_shapes)
         embedding_label: 'UMAP' or 'PHATE'
-        title_prefix:    e.g. 'cell morphology' - the subclass name is appended automatically
-        n_clones, min_embedded_cells: see pick_tightest_clones
-        colors:          [color, ...], at least n_clones long
-        subclasses:      which subclass values to produce a figure for
+        title_prefix: e.g. 'cell morphology' - the subclass name is appended automatically
+        n_clones:     the configured max clones per subclass (same value
+                      passed to select_clones_by_subclass) - every
+                      figure always renders this many panels
+        half_width:   crop size in pixels around each medoid cell's own
+                      centroid - see shared.representative_shapes.
+                      export_representative_shapes for why this should
+                      be a SEPARATE, smaller value for 'nuc' than for 'cell'
+        colors:       [color, ...], at least n_clones long
     Outputs:
         summary: combined clone_summary DataFrame across every subclass
-                 in `subclasses` (a subclass with zero eligible clones
+                 in `selections` (a subclass with zero eligible clones
                  simply contributes no rows, not a missing figure), for
                  notebook inspection
     '''
@@ -179,34 +331,47 @@ def export_clones_by_subclass(embedded_df, dist_matrix, label_to_index, output_d
     os.makedirs(svg_dir, exist_ok=True)
 
     summary_parts = []
-    for subclass in subclasses:
+    for subclass, (lin_ids, summary) in selections.items():
         embedded_subset = embedded_df[embedded_df['subclass'] == subclass]
 
-        lin_ids, summary = pick_tightest_clones(embedded_subset, dist_matrix, label_to_index, n_clones, min_embedded_cells)
         if not lin_ids:
-            print(f"  No clone in subclass '{subclass}' has >= {max(2, min_embedded_cells)} embedded cells - "
-                  f"exporting an empty placeholder figure so every subclass's image stays the same size")
+            print(f"  No clone in subclass '{subclass}' is eligible - exporting empty placeholder figures "
+                  f"so every subclass's images stay the same size")
         elif len(lin_ids) < n_clones:
-            print(f"  Only {len(lin_ids)}/{n_clones} eligible clone(s) in subclass '{subclass}' "
-                  f"(>= {max(2, min_embedded_cells)} embedded cells)")
+            print(f"  Only {len(lin_ids)}/{n_clones} eligible clone(s) in subclass '{subclass}'")
 
-        # every subclass gets a figure with exactly n_clones panels (see
-        # plot_clones_on_embedding's own docstring), whether or not
-        # n_clones clones turned out eligible - otherwise a subclass
-        # with fewer (or zero) eligible clones would export a shorter
-        # image, or no image at all, breaking size consistency across
-        # this notebook's own set of per-subclass figures
+        # every subclass gets figures with exactly n_clones panels (see
+        # plot_clones_on_embedding/plot_clone_shapes' own docstrings),
+        # whether or not n_clones clones turned out eligible
         clone_dfs = [embedded_subset[embedded_subset['lin_id'] == lin_id] for lin_id in lin_ids]
-        fig = plot_clones_on_embedding(
+
+        embedding_fig = plot_clones_on_embedding(
             embedded_df, clone_dfs, lin_ids, colors[:len(lin_ids)], embedding_label,
             f'{title_prefix} - {subclass} clones', n_panels=n_clones,
         )
-        fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}.png'), dpi=200, bbox_inches='tight')
-        fig.savefig(os.path.join(svg_dir, f'{file_prefix}_{subclass}.svg'), bbox_inches='tight')
-        display(fig)
-        plt.close(fig)
+        embedding_fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}.png'), dpi=200, bbox_inches='tight')
+        embedding_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_{subclass}.svg'), bbox_inches='tight')
+        display(embedding_fig)
+        plt.close(embedding_fig)
 
-        subclass_summary = summary.reset_index()
+        medoid_rows = []
+        crops_by_lin_id = {}
+        for lin_id, clone_df in zip(lin_ids, clone_dfs):
+            medoid = pick_clone_medoid(clone_df, dist_matrix, label_to_index)
+            cell_path, nuc_path = extracted_mask_paths(medoid['condition'], int(medoid['frame']), masks_dir)
+            mask_path = cell_path if modality == 'cell' else nuc_path
+            crops_by_lin_id[lin_id] = crop_cell_shape(mask_path, int(medoid['pixel_id']), half_width)
+            medoid_rows.append({'lin_id': lin_id, 'medoid_frame': int(medoid['frame']), 'medoid_pixel_id': int(medoid['pixel_id'])})
+
+        shapes_fig = plot_clone_shapes(crops_by_lin_id, lin_ids, colors[:len(lin_ids)],
+                                        f'{title_prefix} - {subclass} clones', n_panels=n_clones)
+        shapes_fig.savefig(os.path.join(output_dir, f'{file_prefix}_{subclass}_shapes.png'), dpi=200, bbox_inches='tight')
+        shapes_fig.savefig(os.path.join(svg_dir, f'{file_prefix}_{subclass}_shapes.svg'), bbox_inches='tight')
+        display(shapes_fig)
+        plt.close(shapes_fig)
+
+        medoid_df = pd.DataFrame(medoid_rows, columns=['lin_id', 'medoid_frame', 'medoid_pixel_id'])
+        subclass_summary = summary.reset_index().merge(medoid_df, on='lin_id', how='left')
         subclass_summary.insert(0, 'subclass', subclass)
         summary_parts.append(subclass_summary)
 
