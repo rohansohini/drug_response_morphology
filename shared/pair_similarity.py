@@ -70,12 +70,19 @@ def pair_distance_permutation_test(dist_matrix: np.ndarray, pool_indices, real_p
 def plot_pair_similarity_test(null_distances: np.ndarray, observed: dict[str, tuple[np.ndarray, float]],
                                title: str = None) -> plt.Figure:
     '''
-    The null distribution of individual random-pair distances, overlaid
-    with one or more real relationships' own distance distributions
-    (e.g. 'sisters', 'cousins', 'naive') - so several relationships can
-    be compared against the exact same null on one plot. All histograms
-    are density-normalized (not raw counts), since the null is typically
-    built from many more samples than there are real pairs.
+    One violin per distribution - the null (random pairs) plus one or
+    more real relationships' own distance distributions (e.g. 'sisters',
+    'cousins', 'naive') - side by side, not overlaid. Several
+    relationships can still be compared against the exact same null on
+    one plot, but as separate violins sharing one y-axis (pairwise
+    distance) rather than alpha-blended histograms sharing one x-axis -
+    the latter becomes hard to read once there are 2-3 distributions
+    all piled on top of each other in the same region.
+
+    Each real group's own p-value goes into its own x-tick label, not a
+    legend - with every distribution already at its own x position,
+    there's no separate floating UI element (a legend box, a text
+    annotation) that could ever end up overlapping anything else.
 
     Inputs:
         null_distances: (n_null_samples,) from pair_distance_permutation_test -
@@ -90,19 +97,31 @@ def plot_pair_similarity_test(null_distances: np.ndarray, observed: dict[str, tu
     colors = ['tab:red', 'tab:blue', 'tab:green', 'tab:purple', 'tab:orange']
     assert len(observed) <= len(colors), f"plot_pair_similarity_test only has {len(colors)} colors defined"
 
-    fig, ax = plt.subplots(figsize=(6.5, 5))
-    ax.hist(null_distances, bins=50, density=True, color='lightgrey', edgecolor='grey', alpha=0.8, label='null (random pairs)')
-
+    labels = ['null\n(random pairs)']
+    datasets = [null_distances]
+    violin_colors = ['lightgrey']
     for i, (label, (distances, p_value)) in enumerate(observed.items()):
-        color = colors[i % len(colors)]
         p_label = f'< {np.finfo(float).tiny:.1e}' if p_value == 0 else f'= {p_value:.4g}'
-        ax.hist(distances, bins=50, density=True, color=color, edgecolor=color, alpha=0.4, label=f'{label} (p {p_label})')
+        labels.append(f'{label}\n(p {p_label})')
+        datasets.append(distances)
+        violin_colors.append(colors[i % len(colors)])
 
-    ax.set_xlabel('pairwise CAJAL distance')
-    ax.set_ylabel('density')
+    fig, ax = plt.subplots(figsize=(1.8 * len(datasets) + 1.5, 5))
+    parts = ax.violinplot(datasets, showmedians=True)
+
+    for body, color in zip(parts['bodies'], violin_colors):
+        body.set_facecolor(color)
+        body.set_edgecolor(color)
+        body.set_alpha(0.6)
+    for key in ('cmedians', 'cmins', 'cmaxes', 'cbars'):
+        parts[key].set_color('black')
+        parts[key].set_linewidth(1)
+
+    ax.set_xticks(range(1, len(labels) + 1))
+    ax.set_xticklabels(labels)
+    ax.set_ylabel('pairwise CAJAL distance')
     if title is not None:
         ax.set_title(title)
-    ax.legend()
 
     fig.tight_layout()
     return fig

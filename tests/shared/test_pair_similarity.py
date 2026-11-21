@@ -87,6 +87,38 @@ def test_plot_pair_similarity_test_runs_with_multiple_markers():
     print("PASS: plot_pair_similarity_test runs without error with multiple observed distributions")
 
 
+def test_plot_pair_similarity_test_draws_one_violin_per_distribution_with_no_legend():
+    # regression test: this used to overlay alpha-blended histograms on
+    # one shared x-axis, which becomes hard to read once there are 2-3
+    # distributions all piled on top of each other - now each
+    # distribution (null + every observed group) gets its own violin at
+    # its own x position instead, with the p-value in that violin's own
+    # x-tick label rather than a legend (so there's no floating UI
+    # element left that could ever overlap anything)
+    rng = np.random.default_rng(0)
+    null_distances = rng.normal(0.5, 0.1, 1000)
+    fig = plot_pair_similarity_test(null_distances, {
+        'sisters': (rng.normal(0.3, 0.05, 40), 0.0083),
+        'cousins': (rng.normal(0.45, 0.05, 30), 0.2),
+    }, title='test')
+    ax = fig.axes[0]
+
+    # matplotlib's violinplot draws each violin body as its own PolyCollection
+    # (a FillBetweenPolyCollection, a subclass of it)
+    from matplotlib.collections import PolyCollection
+    violin_bodies = [c for c in ax.collections if isinstance(c, PolyCollection)]
+    assert len(violin_bodies) == 3, f"expected 3 violins (null, sisters, cousins), got {len(violin_bodies)}"
+
+    tick_labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert any('null' in l for l in tick_labels)
+    assert any('sisters' in l and '0.0083' in l for l in tick_labels)
+    assert any('cousins' in l and '0.2' in l for l in tick_labels)
+
+    assert ax.get_legend() is None, "a per-violin x-tick label replaces the legend entirely - there should be none"
+
+    print("PASS: plot_pair_similarity_test draws one violin per distribution, p-values in the x-tick labels, no legend")
+
+
 def test_plot_pair_similarity_test_rejects_too_many_labels():
     rng = np.random.default_rng(0)
     null_distances = rng.normal(0.5, 0.1, 100)
@@ -105,5 +137,6 @@ if __name__ == '__main__':
     test_real_pairs_much_farther_than_pool_give_a_large_p_value()
     test_null_never_includes_a_self_pair_zero_distance()
     test_plot_pair_similarity_test_runs_with_multiple_markers()
+    test_plot_pair_similarity_test_draws_one_violin_per_distribution_with_no_legend()
     test_plot_pair_similarity_test_rejects_too_many_labels()
     print("\nAll tests passed.")
