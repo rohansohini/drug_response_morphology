@@ -16,6 +16,7 @@ dependencies:
   - joblib
   - tqdm
   - ipykernel
+  - ipywidgets
   - umap-learn
   - pip
   - pip:
