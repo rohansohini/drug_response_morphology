@@ -4,15 +4,13 @@ import pandas as pd
 import config
 
 
-def select_cells(metadata: pd.DataFrame, drug: str, max_frame: int, rng: np.random.Generator) -> pd.DataFrame:
+def select_cells(metadata: pd.DataFrame, drug: str, min_frame: int, max_frame: int, rng: np.random.Generator) -> pd.DataFrame:
     '''
     Select up to config.SAMPLE_SIZE_PER_FRAME has_mask=True cells per
-    frame, across every frame from 1 to max_frame - the full pooled
-    range this condition's one CAJAL run covers. For 'vem' this is every
-    frame up to config.AFTER_DRUG_END_FRAME (splitting into before-drug
-    vs. after-drug happens later, when the notebook builds sister/cousin
-    pairs, not here); 'naive' has no such split at all, just its own
-    single comparison window.
+    frame, across every frame from min_frame to max_frame - the one
+    window this condition's own CAJAL run covers (see config.py's
+    CONDITIONS: before-drug, after-drug, and naive are each their own
+    separate run now, with their own window).
 
     A flat per-frame sample size, no budget-splitting or subclass
     stratification - this analysis never classifies cells by subclass
@@ -22,16 +20,17 @@ def select_cells(metadata: pd.DataFrame, drug: str, max_frame: int, rng: np.rand
 
     A frame with zero has_mask=True cells (e.g. vem's frame 6, currently
     missing from that dataset entirely - still visited by the loop below
-    since it iterates every frame up to max_frame, not just the named
-    before/after-drug ranges) is skipped gracefully rather than
-    erroring - it just contributes no cells and no sister/cousin pairs
-    from that frame.
+    since it iterates every frame from min_frame to max_frame) is
+    skipped gracefully rather than erroring - it just contributes no
+    cells and no sister/cousin pairs from that frame.
 
     Inputs:
         metadata:  this condition's full metadata DataFrame (must have:
                   frame, has_mask, pixel_id)
         drug:      this condition's drug name (config.CONDITIONS[condition]['drug']),
                   used as the 'condition' column's value
+        min_frame: lowest frame to sample from, inclusive
+                  (config.CONDITIONS[condition]['min_frame'])
         max_frame: highest frame to sample from, inclusive
                   (config.CONDITIONS[condition]['max_frame'])
         rng:       a single shared np.random.Generator, reused across
@@ -45,15 +44,15 @@ def select_cells(metadata: pd.DataFrame, drug: str, max_frame: int, rng: np.rand
         selected: concatenated rows chosen across every frame, with a
                   'condition' column added
     '''
-    visible = metadata[metadata['has_mask'] & (metadata['frame'] <= max_frame)].copy()
+    visible = metadata[metadata['has_mask'] & metadata['frame'].between(min_frame, max_frame)].copy()
     visible['condition'] = drug
 
     assert not visible.empty, (
-        f"no has_mask=True cells at all in frames 1-{max_frame} - nothing to sample"
+        f"no has_mask=True cells at all in frames {min_frame}-{max_frame} - nothing to sample"
     )
 
     selected_parts = []
-    for frame in range(1, max_frame + 1):
+    for frame in range(min_frame, max_frame + 1):
         frame_df = visible[visible['frame'] == frame]
         if frame_df.empty:
             print(f"    frame {frame}: no has_mask=True cells available - skipping")

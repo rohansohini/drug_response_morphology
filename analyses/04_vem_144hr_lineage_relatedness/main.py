@@ -35,13 +35,13 @@ from shared.cajal.run_cajal import run_cajal, needs_recompute
 config.OUTPUT_DIR = os.path.join(ANALYSIS_DIR, config.OUTPUT_DIR)
 
 
-def process_condition(condition: str, drug: str, max_frame: int) -> None:
+def process_condition(condition: str, drug: str, min_frame: int, max_frame: int) -> None:
     masks_dir        = config.masks_dir(condition)
     cajal_output_dir = config.cajal_output_dir(condition)
     os.makedirs(masks_dir, exist_ok=True)
     os.makedirs(cajal_output_dir, exist_ok=True)
 
-    # --- step 1/3: select cells across every frame 1-max_frame ---
+    # --- step 1/3: select cells across this condition's own frame window ---
     #  this is a flat per-frame subsample of the FULL metadata - the
     #  notebook separately re-reads that same full metadata (not just
     #  this selection) to reconstruct the true lineage tree, since a
@@ -50,10 +50,10 @@ def process_condition(condition: str, drug: str, max_frame: int) -> None:
     #  subsample (see shared/lineage_tree.py and the notebook's own
     #  "Method" section).
     print(f"[1/3] ({condition}) Loading metadata and selecting cells...")
-    metadata = pd.read_csv(config.metadata_csv_path(condition))
+    metadata = pd.read_csv(config.metadata_csv_path(drug))
 
     rng = np.random.default_rng(config.SAMPLE_SEED)
-    selected = select_cells(metadata, drug, max_frame, rng)
+    selected = select_cells(metadata, drug, min_frame, max_frame, rng)
     selected['sampled'] = True   # extract_masks expects this column name
 
     print(f"  Selected {len(selected)} cells total across {selected['frame'].nunique()} frames")
@@ -117,8 +117,8 @@ def process_condition(condition: str, drug: str, max_frame: int) -> None:
 
 def main():
     for condition, info in config.CONDITIONS.items():
-        print(f"=== {condition} ({info['drug']}) ===")
-        process_condition(condition, info['drug'], info['max_frame'])
+        print(f"=== {condition} ({info['drug']}, frames {info['min_frame']}-{info['max_frame']}) ===")
+        process_condition(condition, info['drug'], info['min_frame'], info['max_frame'])
         print()
 
     print("Done.")
