@@ -13,8 +13,9 @@ from shared.representative_shapes import crop_cell_shape
 # REGION_COLORS (#ffe119/#f032e6/#008080/#000075/#800000 - see that
 # module's own comment for the full tab10 survey this follows) - a clone
 # color identical to either would make an unrelated category look like
-# the same thing across different plots.
-CLONE_COLORS = ['#46f0f0', '#9a6324', '#000000']
+# the same thing across different plots. (lime replaces an earlier
+# cyan that read as too blue/low-contrast in the plot.)
+CLONE_COLORS = ['#bcf60c', '#9a6324', '#000000']
 
 SUBCLASSES = ['dying', 'persisting', 'slow_prolif', 'fast_prolif']
 
