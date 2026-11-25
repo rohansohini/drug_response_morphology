@@ -4,7 +4,7 @@ from scipy.stats import mannwhitneyu
 
 
 def pair_distance_permutation_test(dist_matrix: np.ndarray, pool_indices, real_pairs: list[tuple[int, int]],
-                                    n_null_samples: int = 10_000, seed: int = 42) -> tuple[np.ndarray, np.ndarray, float]:
+                                    n_null_samples: int = 10_000, seed: int = 42) -> tuple[np.ndarray, np.ndarray, float, float]:
     '''
     Test whether a given set of real pairs (e.g. sister cell pairs, or
     cousin cell pairs) are morphologically more similar than a random
@@ -21,6 +21,18 @@ def pair_distance_permutation_test(dist_matrix: np.ndarray, pool_indices, real_p
     and `seed` each time, so every call's null distribution is directly
     comparable and can be drawn on the same plot (see
     plot_pair_similarity_test).
+
+    Also returns a rank-biserial correlation effect size alongside the
+    p-value - a p-value conflates effect size with sample size (with
+    enough pairs, even a tiny real shift in distance becomes extremely
+    significant, which can look surprising next to two violins that
+    otherwise look similar - see plot_pair_similarity_test), so it is
+    NOT a stand-in for "how big is the effect", and is not comparable in
+    magnitude across tests run on different n. The rank-biserial
+    correlation is: bounded to [-1, 1] regardless of sample size, so IS
+    directly comparable across relationships/groups/degrees, and is
+    derived for free from the same Mann-Whitney U statistic already
+    being computed here.
 
     Inputs:
         dist_matrix:     (n, n) morphological distance matrix (e.g.
@@ -47,6 +59,12 @@ def pair_distance_permutation_test(dist_matrix: np.ndarray, pool_indices, real_p
                               'less') - small means the real pairs are
                               consistently more similar than a random
                               pairing typically manages
+        effect_size:          rank-biserial correlation, r = 1 - 2U/(n1*n2) -
+                              positive means real pairs are stochastically
+                              CLOSER than random pairs (the expected
+                              direction), 0 means no difference from
+                              random, negative means real pairs are
+                              stochastically FARTHER than random pairs
     '''
     observed_distances = np.array([dist_matrix[i, j] for i, j in real_pairs])
 
@@ -63,8 +81,84 @@ def pair_distance_permutation_test(dist_matrix: np.ndarray, pool_indices, real_p
         collision = a == b
     null_distances = dist_matrix[a, b]
 
-    p_value = mannwhitneyu(observed_distances, null_distances, alternative='less').pvalue
-    return observed_distances, null_distances, p_value
+    result = mannwhitneyu(observed_distances, null_distances, alternative='less')
+    p_value = result.pvalue
+    effect_size = 1 - 2 * result.statistic / (len(observed_distances) * len(null_distances))
+    return observed_distances, null_distances, p_value, effect_size
+
+
+def bootstrap_effect_size(observed_distances: np.ndarray, null_distances: np.ndarray,
+                           n_bootstrap: int = 2000, seed: int = 42) -> np.ndarray:
+    '''
+    Bootstrap distribution of the rank-biserial effect size (see
+    pair_distance_permutation_test): resample observed_distances and
+    null_distances - each independently, with replacement - n_bootstrap
+    times, recomputing the effect size each draw. This is the standard
+    nonparametric bootstrap (resampling the already-observed sample, not
+    redrawing fresh from the underlying pool), so it only ever needs ONE
+    group's own already-computed distances.
+
+    Used to put a confidence interval on one group's own effect size,
+    and - via bootstrap_effect_size_difference - to compare two
+    INDEPENDENTLY estimated effect sizes (e.g. before-drug vs after-drug)
+    without needing any notion of shared/exchangeable units between
+    them. A permutation test would need that (shuffle labels between two
+    sets of units that could plausibly belong to either group), which
+    isn't available here: before-drug/after-drug/naive are disjoint
+    cells from entirely separate CAJAL runs, so there's nothing valid to
+    shuffle across them. Bootstrap sidesteps this entirely by only ever
+    resampling WITHIN one group's own data.
+
+    Inputs:
+        observed_distances: (n,) one group's own real-pair distances
+                            (from pair_distance_permutation_test)
+        null_distances:     that SAME group's own null distances (from
+                            the same call to pair_distance_permutation_test)
+        n_bootstrap:        number of bootstrap resamples
+        seed:                RNG seed, for reproducibility
+    Outputs:
+        effect_sizes: (n_bootstrap,) one rank-biserial effect size per resample
+    '''
+    rng = np.random.default_rng(seed)
+    n_obs, n_null = len(observed_distances), len(null_distances)
+
+    effect_sizes = np.empty(n_bootstrap)
+    for i in range(n_bootstrap):
+        obs_sample = rng.choice(observed_distances, size=n_obs, replace=True)
+        null_sample = rng.choice(null_distances, size=n_null, replace=True)
+        result = mannwhitneyu(obs_sample, null_sample, alternative='less')
+        effect_sizes[i] = 1 - 2 * result.statistic / (n_obs * n_null)
+
+    return effect_sizes
+
+
+def bootstrap_effect_size_difference(effect_sizes_a: np.ndarray, effect_sizes_b: np.ndarray) -> tuple[np.ndarray, float, float, float]:
+    '''
+    Bootstrap distribution of the DIFFERENCE between two groups' own
+    effect sizes (each from its own bootstrap_effect_size call, same
+    n_bootstrap) - e.g. "is before-drug's sister effect size bigger than
+    after-drug's, at this degree". Pairs the two bootstrap distributions
+    up position-by-position, which gives the same distribution as an
+    independent difference would (each group's own resampling is already
+    independent of the other's - they're disjoint cells from separate
+    CAJAL runs).
+
+    Inputs:
+        effect_sizes_a, effect_sizes_b: from bootstrap_effect_size, same length
+    Outputs:
+        differences: (n_bootstrap,) effect_sizes_a - effect_sizes_b, per draw
+        ci_low, ci_high: 95% percentile bootstrap CI on the difference -
+                        excluding 0 is the formal "these two groups'
+                        effects differ" conclusion
+        p_value:          two-sided bootstrap p-value for "difference != 0"
+                        (twice the smaller tail's fraction beyond 0)
+    '''
+    assert len(effect_sizes_a) == len(effect_sizes_b), "both bootstrap distributions must have the same n_bootstrap"
+    differences = effect_sizes_a - effect_sizes_b
+    ci_low, ci_high = np.percentile(differences, [2.5, 97.5])
+    frac_below_zero = (differences < 0).mean()
+    p_value = 2 * min(frac_below_zero, 1 - frac_below_zero)
+    return differences, ci_low, ci_high, p_value
 
 
 def plot_pair_similarity_test(null_distances: np.ndarray, observed: dict[str, tuple[np.ndarray, float]],
