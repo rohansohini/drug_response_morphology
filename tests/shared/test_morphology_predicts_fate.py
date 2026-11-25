@@ -151,21 +151,23 @@ def test_plot_permutation_test_handles_a_p_value_of_exactly_zero():
 
     fig = plot_permutation_test(observed_errors, null_errors, p_value=0.0)
     ax = fig.axes[0]
-    labels = ' '.join(t.get_text() for t in ax.get_legend().get_texts())
+    labels = ' '.join(t.get_text() for t in ax.get_xticklabels())
     assert '<' in labels, f"expected a '< ...' fallback for p_value=0, got: {labels!r}"
     plt.close(fig)
 
     print("PASS: plot_permutation_test handles p_value == 0 without crashing or overstating precision")
 
 
-def test_plot_permutation_test_p_value_is_in_the_legend_not_a_separate_text():
-    # regression test: the p-value used to be a separate ax.text
-    # annotation, independently positioned from matplotlib's own
-    # legend(loc='best') - the two could end up directly on top of each
-    # other depending on the data's shape. Folding the p-value into the
-    # 'real' legend entry itself (same pattern as
-    # shared/pair_similarity.py) means there's only one UI element, so
-    # it can never overlap with itself.
+def test_plot_permutation_test_draws_one_violin_per_distribution_with_no_legend():
+    # regression test: this used to overlay alpha-blended histograms on
+    # one shared x-axis, which becomes hard to read once the real
+    # distribution's shift away from the null is subtle relative to
+    # either one's own spread - now each distribution (null, real) gets
+    # its own violin at its own x position instead, with the p-value in
+    # the real violin's own x-tick label rather than a legend (so
+    # there's no floating UI element left that could ever overlap
+    # anything) - same design as shared/pair_similarity.py's
+    # plot_pair_similarity_test.
     rng = np.random.default_rng(0)
     observed_errors = rng.normal(0.3, 0.05, 60)
     null_errors = rng.normal(0.5, 0.05, 6000)
@@ -173,12 +175,18 @@ def test_plot_permutation_test_p_value_is_in_the_legend_not_a_separate_text():
     fig = plot_permutation_test(observed_errors, null_errors, p_value=0.0012)
     ax = fig.axes[0]
 
-    assert len(ax.texts) == 0, f"expected no separate ax.text annotation, found {len(ax.texts)}"
-    labels = [t.get_text() for t in ax.get_legend().get_texts()]
-    assert any('0.0012' in l for l in labels), f"expected the p-value inside a legend label, got {labels}"
+    from matplotlib.collections import PolyCollection
+    violin_bodies = [c for c in ax.collections if isinstance(c, PolyCollection)]
+    assert len(violin_bodies) == 2, f"expected 2 violins (null, real), got {len(violin_bodies)}"
+
+    tick_labels = [t.get_text() for t in ax.get_xticklabels()]
+    assert any('null' in l for l in tick_labels)
+    assert any('real' in l and '0.0012' in l for l in tick_labels)
+
+    assert ax.get_legend() is None, "a per-violin x-tick label replaces the legend entirely - there should be none"
     plt.close(fig)
 
-    print("PASS: the p-value lives in the legend itself, not a separately positioned text annotation")
+    print("PASS: plot_permutation_test draws one violin per distribution, p-value in the x-tick label, no legend")
 
 
 if __name__ == '__main__':
@@ -192,5 +200,5 @@ if __name__ == '__main__':
     test_plot_permutation_test_runs_without_error()
     test_plot_permutation_test_sets_the_given_title()
     test_plot_permutation_test_handles_a_p_value_of_exactly_zero()
-    test_plot_permutation_test_p_value_is_in_the_legend_not_a_separate_text()
+    test_plot_permutation_test_draws_one_violin_per_distribution_with_no_legend()
     print("\nAll tests passed.")

@@ -118,14 +118,20 @@ def knn_prediction_permutation_test(dist_matrix, mixture_matrix, k, n_permutatio
 
 def plot_permutation_test(observed_errors, null_errors, p_value, title=None):
     '''
-    The null distribution of individual prediction errors under random
-    fate-mixture reassignment, overlaid with the real distribution of
-    individual prediction errors (knn_prediction_permutation_test) - lets
-    you see whether real morphology predicts fate consistently across
-    cells, or only for a subset of them, rather than a single collapsed
-    mean hiding that distinction. Both are density-normalized (not raw
-    counts), since the null is typically pooled from many more points
-    than there are real cells.
+    One violin per distribution - the null (random reassignment) and the
+    real (knn_prediction_permutation_test) distribution of individual
+    prediction errors - side by side, not overlaid (same design as
+    shared/pair_similarity.py's plot_pair_similarity_test: two overlaid
+    histograms become hard to read once the real distribution's shift
+    away from the null is subtle relative to either one's own spread,
+    and both distributions are still shown in FULL - not collapsed to a
+    single mean - so you can see whether the effect holds consistently
+    across cells, or only for a subset of them).
+
+    The p-value goes into the real violin's own x-tick label, not a
+    legend - with both distributions already at their own x position,
+    there's no separate floating UI element (a legend box, a text
+    annotation) that could ever end up overlapping anything else.
 
     Inputs:
         observed_errors: (n,) from knn_prediction_permutation_test
@@ -136,31 +142,31 @@ def plot_permutation_test(observed_errors, null_errors, p_value, title=None):
     Outputs:
         fig: caller saves/closes this
     '''
-    fig, ax = plt.subplots(figsize=(6, 5))
-
-    ax.hist(null_errors, bins=50, density=True, color='lightgrey', edgecolor='grey', alpha=0.8, label='null (random reassignment)')
-
-    # the p-value goes into the 'real' legend entry itself, not a
-    # separate floating ax.text annotation - a second, independently
-    # placed text box has no way to know where matplotlib's own
-    # legend(loc='best') will land, and the two can end up directly on
-    # top of each other depending on the data's shape (confirmed
-    # directly). Folding it into the legend (same pattern
-    # shared/pair_similarity.py already uses) means there's only one UI
-    # element, so it can never overlap with itself.
     p_label = f'< {np.finfo(float).tiny:.1e}' if p_value == 0 else f'= {p_value:.4g}'
-    ax.hist(observed_errors, bins=50, density=True, color='tab:red', edgecolor='darkred', alpha=0.5,
-            label=f'real (Mann-Whitney U p {p_label})')
+    labels = ['null\n(random reassignment)', f'real\n(p {p_label})']
+    datasets = [null_errors, observed_errors]
+    violin_colors = ['lightgrey', 'tab:red']
 
+    fig, ax = plt.subplots(figsize=(5, 5))
+    parts = ax.violinplot(datasets, showmedians=True)
+
+    for body, color in zip(parts['bodies'], violin_colors):
+        body.set_facecolor(color)
+        body.set_edgecolor(color)
+        body.set_alpha(0.6)
+    for key in ('cmedians', 'cmins', 'cmaxes', 'cbars'):
+        parts[key].set_color('black')
+        parts[key].set_linewidth(1)
+
+    ax.set_xticks(range(1, len(labels) + 1))
+    ax.set_xticklabels(labels)
     # log2 scale, same reasoning/treatment as shared/pair_similarity.py's
     # plot_pair_similarity_test: prediction error is a strictly positive,
     # right-skewed distance, so a linear axis can compress the low end -
     # where the real shift between the null and real distributions
     # actually lives - into a sliver too small to see by eye
-    ax.set_xscale('log', base=2)
-    ax.set_xlabel('prediction error (log₂ scale)')
-    ax.set_ylabel('density')
-    ax.legend()
+    ax.set_yscale('log', base=2)
+    ax.set_ylabel('prediction error (log₂ scale)')
     if title is not None:
         ax.set_title(title)
 
