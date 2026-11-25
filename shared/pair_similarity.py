@@ -119,7 +119,13 @@ def plot_pair_similarity_test(null_distances: np.ndarray, observed: dict[str, tu
 
     ax.set_xticks(range(1, len(labels) + 1))
     ax.set_xticklabels(labels)
-    ax.set_ylabel('pairwise CAJAL distance')
+    # log2 scale - CAJAL distances are strictly positive and right-skewed
+    # (a handful of very dissimilar pairs stretch the tail out far), which
+    # on a linear axis compresses the low end - where the real median
+    # shift between distributions actually lives - into a sliver too
+    # small to see by eye, even when Mann-Whitney correctly detects it
+    ax.set_yscale('log', base=2)
+    ax.set_ylabel('pairwise CAJAL distance (log₂ scale)')
     if title is not None:
         ax.set_title(title)
 

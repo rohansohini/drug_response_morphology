@@ -152,7 +152,13 @@ def plot_permutation_test(observed_errors, null_errors, p_value, title=None):
     ax.hist(observed_errors, bins=50, density=True, color='tab:red', edgecolor='darkred', alpha=0.5,
             label=f'real (Mann-Whitney U p {p_label})')
 
-    ax.set_xlabel('prediction error')
+    # log2 scale, same reasoning/treatment as shared/pair_similarity.py's
+    # plot_pair_similarity_test: prediction error is a strictly positive,
+    # right-skewed distance, so a linear axis can compress the low end -
+    # where the real shift between the null and real distributions
+    # actually lives - into a sliver too small to see by eye
+    ax.set_xscale('log', base=2)
+    ax.set_xlabel('prediction error (log₂ scale)')
     ax.set_ylabel('density')
     ax.legend()
     if title is not None:
