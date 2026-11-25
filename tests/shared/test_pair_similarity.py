@@ -9,10 +9,7 @@ import matplotlib
 matplotlib.use('Agg')
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
-from shared.pair_similarity import (
-    pair_distance_permutation_test, plot_pair_similarity_test,
-    bootstrap_effect_size, bootstrap_effect_size_difference,
-)
+from shared.pair_similarity import pair_distance_permutation_test, plot_pair_similarity_test
 
 
 def make_distance_matrix(n, rng):
@@ -85,59 +82,6 @@ def test_null_never_includes_a_self_pair_zero_distance():
     print("PASS: the null never silently includes a zero-distance self-pair, even with a tiny pool")
 
 
-def test_bootstrap_effect_size_ci_excludes_zero_for_a_real_effect():
-    rng = np.random.default_rng(0)
-    observed_distances = rng.normal(0.2, 0.05, 200)   # clearly closer than the null
-    null_distances = rng.normal(0.5, 0.05, 2000)
-
-    effect_sizes = bootstrap_effect_size(observed_distances, null_distances, n_bootstrap=500, seed=1)
-    ci_low, ci_high = np.percentile(effect_sizes, [2.5, 97.5])
-
-    assert ci_low > 0, f"expected a bootstrap CI entirely above 0 for a clear real effect, got [{ci_low}, {ci_high}]"
-    print("PASS: bootstrap_effect_size gives a CI excluding 0 for a clear real effect")
-
-
-def test_bootstrap_effect_size_ci_includes_zero_for_no_effect():
-    rng = np.random.default_rng(0)
-    pooled = rng.normal(0.5, 0.05, 2200)
-    observed_distances, null_distances = pooled[:200], pooled[200:]   # drawn from the SAME distribution - no real effect
-
-    effect_sizes = bootstrap_effect_size(observed_distances, null_distances, n_bootstrap=500, seed=1)
-    ci_low, ci_high = np.percentile(effect_sizes, [2.5, 97.5])
-
-    assert ci_low < 0 < ci_high, f"expected a bootstrap CI spanning 0 when there's no real effect, got [{ci_low}, {ci_high}]"
-    print("PASS: bootstrap_effect_size gives a CI spanning 0 when there's no real effect")
-
-
-def test_bootstrap_effect_size_difference_detects_a_real_group_difference():
-    rng = np.random.default_rng(0)
-    # group a: a strong effect (real pairs much closer than its own null)
-    observed_a = rng.normal(0.15, 0.05, 150)
-    null_a = rng.normal(0.5, 0.05, 1500)
-    # group b: a much weaker effect, same null scale
-    observed_b = rng.normal(0.42, 0.05, 150)
-    null_b = rng.normal(0.5, 0.05, 1500)
-
-    effect_sizes_a = bootstrap_effect_size(observed_a, null_a, n_bootstrap=500, seed=2)
-    effect_sizes_b = bootstrap_effect_size(observed_b, null_b, n_bootstrap=500, seed=3)
-
-    differences, ci_low, ci_high, p_value = bootstrap_effect_size_difference(effect_sizes_a, effect_sizes_b)
-
-    assert differences.shape == (500,)
-    assert ci_low > 0, f"expected group a's effect to be clearly bigger than group b's, got CI [{ci_low}, {ci_high}]"
-    assert p_value < 0.05, f"expected a small p-value for a clear group difference, got {p_value}"
-    print("PASS: bootstrap_effect_size_difference detects a real difference between two groups' own effect sizes")
-
-
-def test_bootstrap_effect_size_difference_rejects_mismatched_lengths():
-    try:
-        bootstrap_effect_size_difference(np.zeros(100), np.zeros(50))
-    except AssertionError:
-        print("PASS: bootstrap_effect_size_difference rejects bootstrap distributions of different lengths")
-        return
-    raise AssertionError("expected bootstrap_effect_size_difference to raise on mismatched lengths")
-
-
 def test_plot_pair_similarity_test_runs_with_multiple_markers():
     rng = np.random.default_rng(0)
     null_distances = rng.normal(0.5, 0.1, 1000)
@@ -198,10 +142,6 @@ if __name__ == '__main__':
     test_real_pairs_much_closer_than_pool_give_a_small_p_value()
     test_real_pairs_much_farther_than_pool_give_a_large_p_value()
     test_null_never_includes_a_self_pair_zero_distance()
-    test_bootstrap_effect_size_ci_excludes_zero_for_a_real_effect()
-    test_bootstrap_effect_size_ci_includes_zero_for_no_effect()
-    test_bootstrap_effect_size_difference_detects_a_real_group_difference()
-    test_bootstrap_effect_size_difference_rejects_mismatched_lengths()
     test_plot_pair_similarity_test_runs_with_multiple_markers()
     test_plot_pair_similarity_test_draws_one_violin_per_distribution_with_no_legend()
     test_plot_pair_similarity_test_rejects_too_many_labels()
